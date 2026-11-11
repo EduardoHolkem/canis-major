@@ -31,6 +31,17 @@ public static class Game
     public static void Restart() => Runtime.PendingRoom = Runtime.Room;
     public static void Quit() => Runtime.Running = false;
 
+    /// <summary>A camada da sala aberta com esse nome, ou null. Dá para mudar Visible, Depth, Color e Parallax em tempo de jogo.</summary>
+    public static LayerData? Layer(string name) => Runtime.Layers.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.OrdinalIgnoreCase));
+    public static IReadOnlyList<LayerData> Layers => Runtime.Layers;
+
+    /// <summary>Mostra ou esconde a camada e as instâncias que estão nela.</summary>
+    public static void SetLayerVisible(string name, bool visible)
+    {
+        if (Layer(name) is { } layer) layer.Visible = visible;
+        foreach (var o in Runtime.Instances.Where(o => string.Equals(o.LayerName, name, StringComparison.OrdinalIgnoreCase))) o.Visible = visible;
+    }
+
     public static T Spawn<T>(float x, float y) where T : GameObject => (T)Runtime.Spawn(typeof(T), x, y);
     public static GameObject Spawn(string kind, float x, float y) => Runtime.Spawn(kind, x, y);
 

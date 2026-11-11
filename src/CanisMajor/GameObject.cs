@@ -15,6 +15,15 @@ public abstract class GameObject
     public string? Sprite { get; set; }
     /// <summary>Maior fica por cima.</summary>
     public int Layer { get; set; }
+    /// <summary>Nome da camada da sala em que a instância nasceu (null quando criada por código sem camada).</summary>
+    public string? LayerName { get; set; }
+    /// <summary>
+    /// Ordena pela posição Y dentro da mesma profundidade: quem está mais embaixo na tela fica na frente.
+    /// É assim que o personagem passa atrás de um poste. Vem da camada, e o objeto pode mudar.
+    /// </summary>
+    public bool YSort { get; set; }
+    /// <summary>Soma ao Y só para ordenar, como o pé de um poste alto que fica acima da origem.</summary>
+    public float SortOffset { get; set; }
     public float X { get; set; }
     public float Y { get; set; }
     public float ScaleX { get; set; } = 1;

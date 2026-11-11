@@ -25,7 +25,18 @@ public static class RoomJson
         var props = room.Where(p => p.Key != "instances").ToList();
         var instances = room["instances"] as JsonArray ?? [];
         foreach (var (key, value) in props)
+        {
+            // As camadas também ficam uma por linha, como as instâncias.
+            if (key == "layers" && value is JsonArray layers && layers.Count > 0)
+            {
+                sb.Append("  ").Append(Key(key)).Append(": [\n");
+                for (var i = 0; i < layers.Count; i++)
+                    sb.Append("    ").Append(Instance(layers[i])).Append(i < layers.Count - 1 ? ",\n" : "\n");
+                sb.Append("  ],\n");
+                continue;
+            }
             sb.Append("  ").Append(Key(key)).Append(": ").Append(Value(value)).Append(",\n");
+        }
         sb.Append("  \"instances\": [");
         if (instances.Count == 0)
         {

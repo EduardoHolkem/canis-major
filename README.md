@@ -102,6 +102,25 @@ public class Jogador : GameObject
 
 Cores aceitam texto: `Color = "#9DB8E0"`.
 
+## Salas e camadas
+
+Como no GameMaker, a sala é uma pilha de **camadas**. No editor, o Inspetor da sala mostra a lista de camadas (a de cima fica na frente), com o olho para esconder, **+ Instâncias** e **+ Fundo** para criar, **Subir** e **Descer** para mudar a ordem. O pincel coloca as instâncias na camada ativa, e cada instância pode trocar de camada no Inspetor.
+
+- **Camada de instâncias:** guarda objetos. Com **Ordenar por Y**, quem está mais embaixo na tela fica na frente, e o personagem passa atrás do poste sem código. Um objeto ajusta o ponto de ordem com `SortOffset` (por exemplo, o pé de um poste alto) ou foge da regra com `YSort = false` e `Layer`.
+- **Camada de fundo:** cor, imagem (sprite) repetida na horizontal e na vertical, e **paralaxe** (0 presa ao mundo, 1 presa à tela).
+- **Salas:** no Inspetor, **▶ Testar esta sala**, **★ Sala inicial** e **Duplicar sala**. A sala inicial aparece com ★ na lista.
+
+No arquivo, as camadas ficam em `layers`, e a instância diz a camada em `layer` (sem `layer`, vai para a primeira de instâncias). Salas sem `layers` continuam funcionando como antes.
+
+```json
+"layers": [
+  { "name": "Ceu", "kind": "background", "depth": -100, "color": "#203040", "sprite": "nuvens", "tile_x": true, "parallax": 0.5 },
+  { "name": "Atores", "kind": "instances", "depth": 0, "y_sort": true }
+],
+```
+
+No código, `Game.Layer("Ceu")` devolve a camada (dá para mudar `Visible`, `Depth`, `Color` e `Parallax` durante o jogo), e `Game.SetLayerVisible("Frente", false)` esconde a camada e as instâncias dela.
+
 ## Um shader
 
 Em `shaders/nome.wgsl`, escreva só a função `effect`. A engine completa o resto:

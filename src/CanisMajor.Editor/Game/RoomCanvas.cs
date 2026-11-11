@@ -5,6 +5,8 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using CanisEditor.Theming;
+using LayerData = CanisMajor.LayerData;
+using RoomLayers = CanisMajor.RoomLayers;
 
 namespace CanisEditor.Game;
 
@@ -69,6 +71,12 @@ public sealed class RoomCanvas : Control
 
     // O objeto que o clique num lugar vazio coloca. Null: o clique só escolhe.
     public string? Brush { get; set; }
+
+    // A camada onde o pincel coloca as instâncias novas. Null: a primeira de instâncias.
+    public string? ActiveLayer { get; set; }
+
+    // Só a camada ativa recebe cliques, como no GameMaker. Desligado, qualquer instância visível se escolhe.
+    public bool LockToActiveLayer { get; set; }
 
     // O tamanho da tela do jogo, desenhado como um retângulo para mostrar o que a câmera vê.
     public Size View { get; set; } = new(480, 270);
@@ -136,15 +144,30 @@ public sealed class RoomCanvas : Control
     private SpriteImage? SpriteOfObject(string? objectName) =>
         objectName is not null && Objects.TryGetValue(objectName, out var info) && info.Sprite is { } name ? SpriteFor(name) : null;
 
-    private int LayerOf(RoomInstance instance) => Objects.TryGetValue(instance.Object, out var info) ? info.Layer : 0;
+    // A profundidade, igual ao jogo: com "layers" no arquivo vale a da camada; sem, a do objeto.
+    private int LayerOf(RoomInstance instance) =>
+        _model is { Layers.Count: > 0 } m && m.LayerOf(instance) is { } layer ? layer.Depth
+        : Objects.TryGetValue(instance.Object, out var info) ? info.Layer : 0;
 
-    // A ordem de desenho: camada maior por cima, e na mesma camada a que vem depois no arquivo.
+    private bool YSortOf(RoomInstance instance) =>
+        _model is { Layers.Count: > 0 } m && m.LayerOf(instance) is { YSort: true };
+
+    private bool IsLayerVisible(RoomInstance instance) => _model?.LayerOf(instance) is not { Visible: false };
+
+    private bool IsPickable(RoomInstance instance) =>
+        IsLayerVisible(instance) && (!LockToActiveLayer || _model is null || ActiveLayer is null
+            || string.Equals(_model.LayerOf(instance)?.Name, ActiveLayer, StringComparison.OrdinalIgnoreCase));
+
+    // A ordem de desenho: profundidade maior por cima; na mesma, pela posição Y quando a camada ordena por Y,
+    // senão a que vem depois no arquivo. Camadas escondidas ficam de fora.
     private List<int> DrawOrder()
     {
         if (_model is null)
             return [];
         return Enumerable.Range(0, _model.Instances.Count)
+            .Where(i => IsLayerVisible(_model.Instances[i]))
             .OrderBy(i => LayerOf(_model.Instances[i]))
+            .ThenBy(i => YSortOf(_model.Instances[i]) ? _model.Instances[i].Y : double.MinValue)
             .ThenBy(i => i)
             .ToList();
     }
@@ -156,7 +179,7 @@ public sealed class RoomCanvas : Control
         var order = DrawOrder();
         for (var k = order.Count - 1; k >= 0; k--)
         {
-            if (BoundsOf(_model.Instances[order[k]]).Contains(room))
+            if (IsPickable(_model.Instances[order[k]]) && BoundsOf(_model.Instances[order[k]]).Contains(room))
                 return order[k];
         }
         return -1;
@@ -193,7 +216,12 @@ public sealed class RoomCanvas : Control
         // Pintando, a mesma célula não ganha duas cópias iguais.
         if (_model.Instances.Any(i => string.Equals(i.Object, Brush, StringComparison.OrdinalIgnoreCase) && i.X == at.X && i.Y == at.Y))
             return;
-        _model.Instances.Add(new RoomInstance { Object = Brush, X = at.X, Y = at.Y });
+        var placed = new RoomInstance { Object = Brush, X = at.X, Y = at.Y };
+        // Na camada ativa. A padrão não precisa ir escrita no arquivo.
+        if (ActiveLayer is { } layer && _model.Layers.Count > 0
+            && !string.Equals(layer, RoomLayers.DefaultInstanceLayer(_model.Layers)?.Name, StringComparison.OrdinalIgnoreCase))
+            placed.Layer = layer;
+        _model.Instances.Add(placed);
         SelectedIndex = _model.Instances.Count - 1;
         _changedInGesture = true;
         InvalidateVisual();
@@ -448,8 +476,19 @@ public sealed class RoomCanvas : Control
         using (context.PushRenderOptions(new RenderOptions { BitmapInterpolationMode = _zoom >= 1 ? BitmapInterpolationMode.None : BitmapInterpolationMode.MediumQuality }))
         using (context.PushTransform(Matrix.CreateScale(_zoom, _zoom) * Matrix.CreateTranslation(_pan.X, _pan.Y)))
         {
+            // Fundos e instâncias numa pilha só, como no jogo.
+            var backgrounds = _model.Layers.Where(l => l.IsBackground && l.Visible).OrderBy(l => l.Depth).ToList();
+            var next = 0;
             foreach (var index in DrawOrder())
-                DrawInstance(context, _model.Instances[index], 1);
+            {
+                var instance = _model.Instances[index];
+                while (next < backgrounds.Count && backgrounds[next].Depth <= LayerOf(instance))
+                    DrawBackgroundLayer(context, backgrounds[next++]);
+                // Fora da camada ativa, com a trava ligada, a instância fica apagadinha.
+                DrawInstance(context, instance, IsPickable(instance) ? 1 : 0.45);
+            }
+            while (next < backgrounds.Count)
+                DrawBackgroundLayer(context, backgrounds[next++]);
             DrawGhost(context);
         }
 
@@ -517,6 +556,27 @@ public sealed class RoomCanvas : Control
         var dest = new Rect(instance.X - sprite.OriginX, instance.Y - sprite.OriginY, sprite.FrameWidth, sprite.FrameHeight);
         using (context.PushOpacity(opacity))
             context.DrawImage(sprite.Bitmap, source, dest);
+    }
+
+    // Uma camada de fundo: a cor na sala inteira e o sprite a partir do canto, repetido se pedido.
+    private void DrawBackgroundLayer(DrawingContext context, LayerData layer)
+    {
+        if (_model is null)
+            return;
+        var room = new Rect(0, 0, _model.Width, _model.Height);
+        if (layer.Color is { } hex && Color.TryParse(hex, out var color))
+            context.FillRectangle(new SolidColorBrush(color), room);
+        if (layer.Sprite is not { } name || SpriteFor(name) is not { } sprite)
+            return;
+        var source = new Rect(0, 0, sprite.FrameWidth, sprite.FrameHeight);
+        using (context.PushClip(room))
+        {
+            var endX = layer.TileX ? _model.Width : 1;
+            var endY = layer.TileY ? _model.Height : 1;
+            for (double y = 0; y < endY; y += sprite.FrameHeight)
+                for (double x = 0; x < endX; x += sprite.FrameWidth)
+                    context.DrawImage(sprite.Bitmap, source, new Rect(x, y, sprite.FrameWidth, sprite.FrameHeight));
+        }
     }
 
     // A prévia do pincel embaixo do mouse, onde o clique vai colocar.

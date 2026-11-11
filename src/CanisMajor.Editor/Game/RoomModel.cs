@@ -13,6 +13,17 @@ public sealed class RoomInstance
     public double Y { get; set; }
     public JsonObject Extra { get; set; } = new();
 
+    // A camada fica em "layer", junto das outras propriedades.
+    public string? Layer
+    {
+        get => Extra["layer"] is JsonValue v && v.TryGetValue<string>(out var name) ? name : null;
+        set
+        {
+            if (value is null) Extra.Remove("layer");
+            else Extra["layer"] = value;
+        }
+    }
+
     public RoomInstance Clone() => new() { Object = Object, X = X, Y = Y, Extra = (JsonObject)Extra.DeepClone() };
 
     public JsonObject ToJson()
@@ -96,7 +107,15 @@ public sealed class RoomModel
         var model = new RoomModel();
         foreach (var (key, value) in node)
         {
-            if (key == "instances")
+            if (key == "layers" && value is JsonArray layers)
+            {
+                foreach (var item in layers)
+                {
+                    if (item is JsonObject obj && obj.Deserialize<LayerData>(GameProject.Json) is { } layer)
+                        model.Layers.Add(layer);
+                }
+            }
+            else if (key == "instances")
             {
                 if (value is not JsonArray list)
                     throw new JsonException("\"instances\" precisa ser uma lista.");
@@ -117,9 +136,45 @@ public sealed class RoomModel
     public string Serialize()
     {
         var root = (JsonObject)Properties.DeepClone();
+        if (Layers.Count > 0)
+            root["layers"] = new JsonArray(Layers.Select(l => (JsonNode?)LayerToJson(l)).ToArray());
         root["instances"] = new JsonArray(Instances.Select(i => (JsonNode?)i.ToJson()).ToArray());
         return RoomJson.Format(root);
     }
 
     public RoomModel Clone() => Parse(Serialize());
+
+    // Camadas. Vazia, a sala tem só a camada de instâncias padrão, e o arquivo nem ganha "layers".
+    public List<LayerData> Layers { get; } = new();
+
+    // As camadas como o jogo vai ver.
+    public List<LayerData> EffectiveLayers => Layers.Count > 0 ? Layers : [new LayerData { Name = RoomLayers.DefaultName }];
+
+    // Antes de mexer nas camadas pela interface, a padrão vira de verdade no arquivo.
+    public void EnsureLayers()
+    {
+        if (Layers.Count == 0)
+            Layers.Add(new LayerData { Name = RoomLayers.DefaultName });
+    }
+
+    public LayerData? FindLayer(string? name) =>
+        name is null ? null : EffectiveLayers.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    // A camada de uma instância: a do "layer", ou a primeira de instâncias.
+    public LayerData? LayerOf(RoomInstance instance) =>
+        FindLayer(instance.Layer) ?? RoomLayers.DefaultInstanceLayer(EffectiveLayers);
+
+    // Só o que foge do padrão vai para o arquivo, para ele ficar curto.
+    private static JsonObject LayerToJson(LayerData layer)
+    {
+        var json = new JsonObject { ["name"] = layer.Name, ["kind"] = layer.Kind, ["depth"] = layer.Depth };
+        if (!layer.Visible) json["visible"] = false;
+        if (layer.YSort) json["y_sort"] = true;
+        if (layer.Color is not null) json["color"] = layer.Color;
+        if (layer.Sprite is not null) json["sprite"] = layer.Sprite;
+        if (layer.TileX) json["tile_x"] = true;
+        if (layer.TileY) json["tile_y"] = true;
+        if (layer.Parallax != 0) json["parallax"] = layer.Parallax;
+        return json;
+    }
 }

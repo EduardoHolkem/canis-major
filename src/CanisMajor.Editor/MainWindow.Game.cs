@@ -123,6 +123,7 @@ public partial class MainWindow
             var folder = Path.Combine(RootFolder!, section.Folder);
             var open = !_closedGameSections.Contains(folder);
             var resources = GameFiles.List(RootFolder!, section.Kind);
+            var startRoom = section.Kind == "room" ? StartRoomName() : null;
             rows.Add(new TreeRow(
                 section.Title, folder, true, new Thickness(6, 0, 0, 0),
                 open ? ChevronOpen : ChevronClosed, FontWeight.Medium, Brushes.Transparent, palette.Muted,
@@ -142,7 +143,7 @@ public partial class MainWindow
                     gitBrush = BrushOf(mark.Kind);
                 }
                 rows.Add(new TreeRow(
-                    resource.Name, resource.Path, false, new Thickness(18, 0, 0, 0), null,
+                    string.Equals(resource.Name, startRoom, StringComparison.OrdinalIgnoreCase) ? resource.Name + "  ★" : resource.Name, resource.Path, false, new Thickness(18, 0, 0, 0), null,
                     active ? FontWeight.SemiBold : FontWeight.Normal,
                     active ? palette.Tint : Brushes.Transparent,
                     gitLetter.Length > 0 ? gitBrush : palette.Ink,
@@ -422,6 +423,7 @@ public partial class MainWindow
     {
         AddHeading("Pincel", first: true);
         AddBrushPalette();
+        BuildLayersSection(room);
 
         if (RoomView.Selected is { } instance)
         {
@@ -442,7 +444,24 @@ public partial class MainWindow
             AddRow("Objeto", picker);
             AddNumberField("X", instance.X, "i.x", value => { instance.X = value; RoomView.InvalidateVisual(); WriteRoom(); });
             AddNumberField("Y", instance.Y, "i.y", value => { instance.Y = value; RoomView.InvalidateVisual(); WriteRoom(); });
-            foreach (var (key, value) in instance.Extra.ToList())
+            var layerNames = room.EffectiveLayers.Where(l => !l.IsBackground).Select(l => l.Name).ToList();
+            if (layerNames.Count > 1)
+            {
+                var current = room.LayerOf(instance)?.Name ?? layerNames[0];
+                var layerPicker = new ComboBox { ItemsSource = layerNames, SelectedItem = layerNames.FirstOrDefault(n => string.Equals(n, current, StringComparison.OrdinalIgnoreCase)), HorizontalAlignment = HorizontalAlignment.Stretch, FontSize = 12, Tag = "i.layer" };
+                layerPicker.SelectionChanged += (_, _) =>
+                {
+                    if (layerPicker.SelectedItem is string chosen && !string.Equals(chosen, current, StringComparison.OrdinalIgnoreCase))
+                    {
+                        instance.Layer = string.Equals(chosen, CanisMajor.RoomLayers.DefaultInstanceLayer(room.EffectiveLayers)?.Name, StringComparison.OrdinalIgnoreCase) ? null : chosen;
+                        RoomView.InvalidateVisual();
+                        WriteRoom();
+                        BuildInspector();
+                    }
+                };
+                AddRow("Camada", layerPicker);
+            }
+            foreach (var (key, value) in instance.Extra.Where(p => p.Key != "layer").ToList())
             {
                 var text = value?.ToJsonString() ?? "null";
                 AddTextField(key, text, "i.extra." + key, typed =>
@@ -464,6 +483,8 @@ public partial class MainWindow
         }
 
         AddHeading("Sala");
+        if (ActiveDocument is { } roomDocument)
+            BuildRoomActions(roomDocument.FullPath);
         AddNumberField("Largura", room.Width, "r.width", value => { room.Width = (int)value; RoomView.InvalidateVisual(); WriteRoom(); });
         AddNumberField("Altura", room.Height, "r.height", value => { room.Height = (int)value; RoomView.InvalidateVisual(); WriteRoom(); });
         AddNumberField("Grade", room.Grid, "r.grid", value => { room.Grid = (int)value; RoomView.InvalidateVisual(); WriteRoom(); });
@@ -554,7 +575,7 @@ public partial class MainWindow
     {
         var name = await AskTextAsync("Nova propriedade", "O nome do campo no objeto, como speed. Depois escreva o valor no Inspetor.", "Acrescentar",
             text => string.IsNullOrWhiteSpace(text) ? "Escreva um nome."
-                : text.Trim() is "object" or "x" or "y" ? "Esse nome já é usado pela sala."
+                : text.Trim() is "object" or "x" or "y" or "layer" ? "Esse nome já é usado pela sala."
                 : instance.Extra.ContainsKey(text.Trim()) ? "Essa propriedade já existe."
                 : null);
         if (name is null)
@@ -932,6 +953,13 @@ public partial class MainWindow
         if (!_isGame)
             return;
         actions.Add(("Nova sala", "rooms/", () => _ = CreateResourceAsync("room")));
+        if (IsRoomDocument && ActiveDocument is { } roomDoc)
+        {
+            var roomName = Path.GetFileNameWithoutExtension(roomDoc.FullPath);
+            actions.Add(("Testar esta sala", roomName, () => RunRoom(roomName)));
+            actions.Add(("Tornar sala inicial", roomName, () => SetStartRoom(roomName)));
+            actions.Add(("Duplicar sala", roomName, () => _ = DuplicateRoomAsync(roomDoc.FullPath)));
+        }
         actions.Add(("Novo objeto", "objects/", () => _ = CreateResourceAsync("object")));
         actions.Add(("Novo sprite", "sprites/", () => _ = CreateResourceAsync("sprite")));
         actions.Add(("Novo shader", "shaders/", () => _ = CreateResourceAsync("shader")));

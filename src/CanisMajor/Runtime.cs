@@ -158,22 +158,77 @@ internal static unsafe class Runtime
         PostShaders = [.. room.PostShaders];
         foreach (var s in PostShaders) Shader(s);
         CameraX = CameraY = 0;
+        // Sem "layers" no arquivo, cada objeto fica na profundidade que ele mesmo define (salas antigas).
+        var explicitLayers = room.Layers.Count > 0;
+        Layers = RoomLayers.Resolve(room);
+        var fallback = RoomLayers.DefaultInstanceLayer(Layers);
         foreach (var inst in room.Instances)
         {
             var kind = inst["object"]?.GetValue<string>() ?? throw new GameException($"Uma instância da sala '{name}' não diz qual é o objeto.");
             var x = inst["x"]?.GetValue<float>() ?? 0;
             var y = inst["y"]?.GetValue<float>() ?? 0;
             var obj = Spawn(kind, x, y, create: false);
+            var layerName = inst["layer"]?.GetValue<string>();
+            var layer = layerName is null ? fallback
+                : Layers.FirstOrDefault(l => string.Equals(l.Name, layerName, StringComparison.OrdinalIgnoreCase))
+                  ?? throw new GameException($"A sala '{name}' usa a camada '{layerName}', que não existe em \"layers\".");
+            if (layer is not null)
+            {
+                obj.LayerName = layer.Name;
+                if (explicitLayers)
+                {
+                    obj.Layer = layer.Depth;
+                    obj.YSort = layer.YSort;
+                }
+                if (!layer.Visible) obj.Visible = false;
+            }
             ApplyProps(obj, inst);
             obj.OnCreate();
         }
+    }
+
+    /// <summary>As camadas da sala aberta.</summary>
+    public static List<LayerData> Layers = [];
+
+    // Fundos e instâncias numa pilha só, da profundidade menor para a maior.
+    private static void DrawWorld()
+    {
+        var backgrounds = Layers.Where(l => l.IsBackground && l.Visible).OrderBy(l => l.Depth).ToList();
+        var next = 0;
+        foreach (var o in Instances.Where(o => o.Visible && o.Alive).OrderBy(RoomLayers.SortKey).ToArray())
+        {
+            while (next < backgrounds.Count && backgrounds[next].Depth <= o.Layer)
+                DrawBackground(backgrounds[next++]);
+            if (o.Visible && o.Alive) o.OnDraw();
+        }
+        while (next < backgrounds.Count)
+            DrawBackground(backgrounds[next++]);
+    }
+
+    private static void DrawBackground(LayerData layer)
+    {
+        var viewW = Project!.Info.Width;
+        var viewH = Project.Info.Height;
+        if (layer.Color is { } hex)
+            Rect(0, 0, RoomWidth, RoomHeight, Color.Hex(hex), 0, 0, false);
+        if (SpriteInfo(layer.Sprite) is not { } s) return;
+        // Paralaxe: a camada anda uma fração do que a câmera anda.
+        var baseX = CameraX * layer.Parallax;
+        var baseY = CameraY * layer.Parallax;
+        var startX = layer.TileX ? baseX + MathF.Floor((CameraX - baseX) / s.Width) * s.Width : baseX;
+        var startY = layer.TileY ? baseY + MathF.Floor((CameraY - baseY) / s.Height) * s.Height : baseY;
+        var endX = layer.TileX ? CameraX + viewW : startX + 1;
+        var endY = layer.TileY ? CameraY + viewH : startY + 1;
+        for (var y = startY; y < endY; y += s.Height)
+            for (var x = startX; x < endX; x += s.Width)
+                Quad(s.Texture, x, y, s.Width, s.Height, 0, 0, 0, s.Uv(0), Color.White, 0);
     }
 
     private static void ApplyProps(GameObject obj, JsonObject inst)
     {
         foreach (var (key, value) in inst)
         {
-            if (key is "object" or "x" or "y" || value is null) continue;
+            if (key is "object" or "x" or "y" or "layer" || value is null) continue;
             var name = string.Concat(key.Split('_').Select(p => p.Length > 0 ? char.ToUpperInvariant(p[0]) + p[1..] : p));
             var flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase;
             var type = obj.GetType();
@@ -379,8 +434,7 @@ internal static unsafe class Runtime
 
             _cmdCount = 0;
             Strings.Clear();
-            foreach (var o in Instances.OrderBy(o => o.Layer).ToArray())
-                if (o.Visible && o.Alive) o.OnDraw();
+            DrawWorld();
 
             var post = PostShaders.Select(Shader).ToArray();
             (clear[0], clear[1], clear[2], clear[3]) = (Background.R, Background.G, Background.B, Background.A);

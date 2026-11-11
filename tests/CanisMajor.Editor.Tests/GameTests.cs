@@ -143,7 +143,8 @@ public class GameTests
 
         Assert.True(window.IsGameProject);
         Assert.True(window.IsGameView);
-        Assert.Equal(["Salas", "inicio", "Objetos", "Cubo", "Estrela", "Jogador", "Parede", "Placar"], window.TreeRows.Take(8).Select(r => r.Name));
+        Assert.Equal(["Salas", "inicio  ★", "Objetos", "Cubo", "Estrela", "Jogador", "Parede", "Placar"], window.TreeRows.Take(8).Select(r => r.Name));
+        // A sala inicial ganha uma estrela na lista.
         Assert.Contains(window.TreeRows, r => r.Name == "Sons");
 
         window.SetGameView(false);
