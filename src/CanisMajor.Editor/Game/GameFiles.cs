@@ -22,6 +22,7 @@ public static partial class GameFiles
         new("object", "objects", "Objetos", "objeto", [".cs", ".json"]),
         new("sprite", "sprites", "Sprites", "sprite", [".png"]),
         new("shader", "shaders", "Shaders", "shader", [".wgsl"]),
+        new("tileset", "tilesets", "Tilesets", "tileset", [".json"]),
         new("sound", "sounds", "Sons", "som", [".wav", ".ogg"]),
     ];
 
@@ -236,6 +237,15 @@ public static partial class GameFiles
             {
                 var path = Path.Combine(folder, name + ".wgsl");
                 Write(path, Templates.NewShader.Replace("\r\n", "\n"));
+                return path;
+            }
+            case "tileset":
+            {
+                // Aponta para um sprite de mesmo nome, se houver, ou para o primeiro.
+                var sprites = List(root, "sprite");
+                var sprite = sprites.FirstOrDefault(s => string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase))?.Name ?? sprites.FirstOrDefault()?.Name ?? "";
+                var path = Path.Combine(folder, name + ".json");
+                Write(path, JsonSerializer.Serialize(new TilesetData { Sprite = sprite }, GameProject.Json) + "\n");
                 return path;
             }
             default:

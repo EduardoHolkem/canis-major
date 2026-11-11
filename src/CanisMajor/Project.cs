@@ -87,6 +87,7 @@ public sealed class GameProject
         "room" => "rooms",
         "shader" => "shaders",
         "sound" => "sounds",
+        "tileset" => "tilesets",
         _ => throw new ArgumentException($"tipo de recurso desconhecido: {kind}"),
     });
 
@@ -106,6 +107,20 @@ public sealed class GameProject
     }
 
     /// <summary>A ficha do objeto (objects/Nome.json), ou null se ele não tiver uma.</summary>
+    public TilesetData LoadTileset(string name)
+    {
+        var path = Path.Combine(Folder("tileset"), name + ".json");
+        if (!File.Exists(path)) throw new GameException($"O tileset '{name}' não existe em tilesets/.");
+        try
+        {
+            return JsonSerializer.Deserialize<TilesetData>(File.ReadAllText(path), Json) ?? new TilesetData();
+        }
+        catch (JsonException e)
+        {
+            throw new GameException($"{path}: {e.Message}");
+        }
+    }
+
     public ObjectDef? LoadObjectDef(string name)
     {
         var path = Path.Combine(Folder("object"), name + ".json");

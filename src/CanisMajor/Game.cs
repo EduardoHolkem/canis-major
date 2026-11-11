@@ -42,6 +42,20 @@ public static class Game
         foreach (var o in Runtime.Instances.Where(o => string.Equals(o.LayerName, name, StringComparison.OrdinalIgnoreCase))) o.Visible = visible;
     }
 
+    /// <summary>O tile no ponto do mundo (em pixels) na camada de tiles, ou -1.</summary>
+    public static int TileAt(string layer, float x, float y)
+    {
+        if (Runtime.TileLayer(layer) is not { } l || Runtime.TilesetOf(l) is not { } set) return -1;
+        return l.TileAt((int)MathF.Floor(x / set.TileWidth), (int)MathF.Floor(y / set.TileHeight));
+    }
+
+    /// <summary>Troca o tile no ponto do mundo (em pixels). -1 apaga. Serve para quebrar blocos, abrir portas e cavar.</summary>
+    public static void SetTile(string layer, float x, float y, int id)
+    {
+        if (Runtime.TileLayer(layer) is not { } l || Runtime.TilesetOf(l) is not { } set) return;
+        l.SetTile((int)MathF.Floor(x / set.TileWidth), (int)MathF.Floor(y / set.TileHeight), id);
+    }
+
     public static T Spawn<T>(float x, float y) where T : GameObject => (T)Runtime.Spawn(typeof(T), x, y);
     public static GameObject Spawn(string kind, float x, float y) => Runtime.Spawn(kind, x, y);
 

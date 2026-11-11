@@ -66,3 +66,39 @@ public sealed class RoomLayersTests
         Assert.Contains("\n    { \"name\": \"Atores\"", text);
     }
 }
+
+public sealed class TileLayerTests
+{
+    [Fact]
+    public void TileLayerRoundTripsAndTrimsEmptyEnd()
+    {
+        var room = RoomModel.Parse("""{ "width": 64, "height": 64, "layers": [ { "name": "Atores", "kind": "instances", "depth": 0 }, { "name": "Chao", "kind": "tiles", "depth": -10, "tileset": "terra", "columns": 4, "tiles": [0, 1, -1, 2] } ], "instances": [] }""");
+        var layer = room.FindLayer("Chao")!;
+        Assert.True(layer.IsTiles);
+        Assert.Equal(2, layer.TileAt(3, 0));
+        layer.SetTile(1, 5, -1); // apagar fora do pintado não suja o arquivo
+        var text = room.Serialize();
+        Assert.Contains("\"tileset\": \"terra\"", text);
+        Assert.Contains("\"tiles\": [0, 1, -1, 2]", text);
+        Assert.Equal(2, RoomModel.Parse(text).FindLayer("Chao")!.TileAt(3, 0));
+    }
+
+    [Fact]
+    public void CanvasPaintsAndErasesOnActiveTileLayer()
+    {
+        var room = RoomModel.Parse("""{ "width": 64, "height": 64, "layers": [ { "name": "Atores", "kind": "instances", "depth": 0 }, { "name": "Chao", "kind": "tiles", "depth": -10, "tileset": "terra", "columns": 4, "tiles": [] } ], "instances": [] }""");
+        var canvas = new RoomCanvas
+        {
+            Model = room,
+            TilesetFor = _ => new CanisMajor.TilesetData { Sprite = "terra", TileWidth = 16, TileHeight = 16 },
+            ActiveLayer = "Chao",
+            TileBrush = 3,
+        };
+        Assert.True(canvas.PaintTile(new Avalonia.Point(40, 20), 3));
+        Assert.Equal(3, room.FindLayer("Chao")!.TileAt(2, 1));
+        Assert.False(canvas.PaintTile(new Avalonia.Point(40, 20), 3)); // igual, não muda
+        Assert.True(canvas.PaintTile(new Avalonia.Point(40, 20), -1));
+        Assert.Equal(-1, room.FindLayer("Chao")!.TileAt(2, 1));
+        Assert.Empty(room.Instances);
+    }
+}

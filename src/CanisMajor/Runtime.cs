@@ -18,7 +18,7 @@ public sealed record SpriteInfo(uint Texture, float Width, float Height, int Fra
 }
 
 /// <summary>Estado da engine que está rodando. O jogo usa a fachada pública <see cref="Game"/>.</summary>
-internal static unsafe class Runtime
+internal static unsafe partial class Runtime
 {
     public static bool Started;
     public static GameProject? Project;
@@ -195,12 +195,12 @@ internal static unsafe class Runtime
     // Fundos e instâncias numa pilha só, da profundidade menor para a maior.
     private static void DrawWorld()
     {
-        var backgrounds = Layers.Where(l => l.IsBackground && l.Visible).OrderBy(l => l.Depth).ToList();
+        var backgrounds = Layers.Where(l => (l.IsBackground || l.IsTiles) && l.Visible).OrderBy(l => l.Depth).ToList();
         var next = 0;
         foreach (var o in Instances.Where(o => o.Visible && o.Alive).OrderBy(RoomLayers.SortKey).ToArray())
         {
             while (next < backgrounds.Count && backgrounds[next].Depth <= o.Layer)
-                DrawBackground(backgrounds[next++]);
+                DrawLayer(backgrounds[next++]);
             if (o.Visible && o.Alive)
             {
                 o.OnDraw();
@@ -208,7 +208,13 @@ internal static unsafe class Runtime
             }
         }
         while (next < backgrounds.Count)
-            DrawBackground(backgrounds[next++]);
+            DrawLayer(backgrounds[next++]);
+    }
+
+    private static void DrawLayer(LayerData layer)
+    {
+        if (layer.IsTiles) DrawTiles(layer);
+        else DrawBackground(layer);
     }
 
     private static void DrawBackground(LayerData layer)

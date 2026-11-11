@@ -31,6 +31,7 @@ public partial class MainWindow
         var actions = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0) };
         actions.Children.Add(SmallButton("+ Instâncias", "Nova camada para objetos", () => _ = AddLayerAsync(room, background: false)));
         actions.Children.Add(SmallButton("+ Fundo", "Nova camada de fundo, com cor ou imagem", () => _ = AddLayerAsync(room, background: true)));
+        actions.Children.Add(SmallButton("+ Tiles", "Nova camada para pintar tiles de um tileset", () => _ = AddTileLayerAsync(room)));
         actions.Children.Add(SmallButton("Subir", "Traz a camada ativa para a frente", () => MoveLayer(room, +1)));
         actions.Children.Add(SmallButton("Descer", "Manda a camada ativa para trás", () => MoveLayer(room, -1)));
         actions.Children.Add(SmallButton("Excluir", "Exclui a camada ativa", () => _ = DeleteLayerAsync(room)));
@@ -88,14 +89,14 @@ public partial class MainWindow
             Padding = new Thickness(8, 3),
             Content = new TextBlock
             {
-                Text = (layer.IsBackground ? "▦ " : "◆ ") + layer.Name + (layer.YSort ? "  ↕Y" : ""),
+                Text = (layer.IsBackground ? "▦ " : layer.IsTiles ? "▤ " : "◆ ") + layer.Name + (layer.YSort ? "  ↕Y" : ""),
                 FontSize = 12,
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 Opacity = layer.Visible ? 1 : 0.5,
             },
             Tag = "l.name." + layer.Name,
         };
-        ToolTip.SetTip(name, layer.IsBackground ? "Camada de fundo" : "Camada de instâncias. Clique para o pincel colocar aqui.");
+        ToolTip.SetTip(name, layer.IsBackground ? "Camada de fundo" : layer.IsTiles ? "Camada de tiles. Clique para pintar nela." : "Camada de instâncias. Clique para o pincel colocar aqui.");
         name.Click += (_, _) =>
         {
             RoomView.ActiveLayer = layer.Name;
@@ -112,13 +113,117 @@ public partial class MainWindow
         return grid;
     }
 
+    // Camada de tiles: o tileset, a paleta para escolher o tile do pincel e a colisão à vista.
+    private void BuildTileLayerFields(RoomModel room, LayerData layer)
+    {
+        var names = TilesetNames();
+        if (names.Count == 0)
+        {
+            AddNote("Este jogo ainda não tem tileset. Crie um pelo + da lista ao lado (Novo tileset).");
+            return;
+        }
+        AddChoice("Tileset", names, layer.Tileset ?? names[0], "l.f.tileset", chosen => EditLayer(room, layer.Name, l => l.Tileset = chosen));
+        var set = LoadTileset(layer.Tileset);
+        if (set is null)
+        {
+            AddNote("Não achei esse tileset. Escolha outro acima.");
+            return;
+        }
+
+        AddNote("Clique no tile para pôr no pincel. Na sala, o botão esquerdo pinta e o direito apaga, e arrastar continua.");
+        var palette = new TilesetView { EditSolid = RoomView.ShowCollision, Selected = RoomView.TileBrush, MaxScale = 3, HorizontalAlignment = HorizontalAlignment.Left, Tag = "l.f.palette" };
+        palette.Show(LoadSprite(set.Sprite), set);
+        palette.TileClicked += id =>
+        {
+            RoomView.TileBrush = id;
+            RoomView.Focus();
+        };
+        Inspector.Children.Add(palette);
+
+        var collision = new CheckBox { Content = "Mostrar os tiles sólidos em vermelho", IsChecked = RoomView.ShowCollision, FontSize = 12, Tag = "l.f.collision" };
+        collision.IsCheckedChanged += (_, _) =>
+        {
+            RoomView.ShowCollision = collision.IsChecked == true;
+            RoomView.InvalidateVisual();
+            BuildInspector();
+        };
+        Inspector.Children.Add(collision);
+
+        var used = layer.Tiles.Count(t => t >= 0);
+        AddNote($"{used} {(used == 1 ? "tile pintado" : "tiles pintados")}, mapa de {layer.Columns} colunas. No código, Move(dx, dy, solid: \"{layer.Name}\") para nos tiles sólidos, e Game.SetTile(\"{layer.Name}\", x, y, -1) apaga um.");
+        var actions = new WrapPanel { Orientation = Orientation.Horizontal };
+        actions.Children.Add(SmallButton("Ajustar ao tamanho da sala", "Recalcula as colunas pela largura da sala", () => EditLayer(room, layer.Name, l => ResizeTiles(l, room, set))));
+        actions.Children.Add(SmallButton("Limpar tiles", "Apaga todos os tiles desta camada (Ctrl Z desfaz)", () => EditLayer(room, layer.Name, l => l.Tiles.Clear())));
+        Inspector.Children.Add(actions);
+    }
+
+    // Muda o número de colunas sem embaralhar os tiles já pintados.
+    private static void ResizeTiles(LayerData layer, RoomModel room, CanisMajor.TilesetData set)
+    {
+        var columns = Math.Max(1, (int)Math.Ceiling(room.Width / (double)set.TileWidth));
+        if (columns == layer.Columns)
+            return;
+        var old = layer.Tiles.ToList();
+        var oldColumns = Math.Max(1, layer.Columns);
+        var rows = layer.Rows;
+        layer.Tiles.Clear();
+        layer.Columns = columns;
+        for (var r = 0; r < rows; r++)
+            for (var c = 0; c < Math.Min(columns, oldColumns); c++)
+            {
+                var index = r * oldColumns + c;
+                if (index < old.Count && old[index] >= 0)
+                    layer.SetTile(c, r, old[index]);
+            }
+    }
+
+    private async Task AddTileLayerAsync(RoomModel room)
+    {
+        var tilesets = TilesetNames();
+        if (tilesets.Count == 0)
+        {
+            ShowStatus("Crie um tileset primeiro, pelo + da lista ao lado.");
+            return;
+        }
+        var suggestion = "Tiles";
+        for (var n = 2; room.FindLayer(suggestion) is not null; n++)
+            suggestion = "Tiles" + n;
+        var name = await AskTextAsync("Nova camada de tiles", "O nome aparece na lista e no código, como em Move(dx, dy, solid: \"nome\").", "Criar",
+            text => string.IsNullOrWhiteSpace(text) ? "Escreva um nome."
+                : room.FindLayer(text.Trim()) is not null ? "Já existe uma camada com esse nome."
+                : null,
+            suggestion);
+        if (name is null)
+            return;
+        room.EnsureLayers();
+        var set = LoadTileset(tilesets[0]) ?? new CanisMajor.TilesetData();
+        // Tiles nascem logo atrás das instâncias.
+        var depth = room.Layers.Where(l => l.IsInstances).Select(l => l.Depth).DefaultIfEmpty(0).Min() - 10;
+        room.Layers.Add(new LayerData
+        {
+            Name = name.Trim(),
+            Kind = "tiles",
+            Depth = depth,
+            Tileset = tilesets[0],
+            Columns = Math.Max(1, (int)Math.Ceiling(room.Width / (double)set.TileWidth)),
+        });
+        RoomView.ActiveLayer = name.Trim();
+        RoomView.TileBrush = 0;
+        RoomChanged();
+    }
+
     private void BuildActiveLayerFields(RoomModel room, LayerData layer)
     {
         AddHeading($"Camada {layer.Name}");
         AddTextField("Nome", layer.Name, "l.f.name", typed => RenameLayer(room, layer.Name, typed.Trim()));
         AddNumberField("Profundidade", layer.Depth, "l.f.depth", value => EditLayer(room, layer.Name, l => l.Depth = (int)value));
 
-        if (!layer.IsBackground)
+        if (layer.IsTiles)
+        {
+            BuildTileLayerFields(room, layer);
+            return;
+        }
+        if (layer.IsInstances)
         {
             var ysort = new CheckBox { Content = "Ordenar por Y (quem está mais embaixo fica na frente)", IsChecked = layer.YSort, FontSize = 12, Tag = "l.f.ysort" };
             ysort.IsCheckedChanged += (_, _) => EditLayer(room, layer.Name, l => l.YSort = ysort.IsChecked == true);
@@ -337,7 +442,7 @@ public partial class MainWindow
         room.EnsureLayers();
         if (room.FindLayer(RoomView.ActiveLayer) is not { } layer)
             return;
-        if (!layer.IsBackground && room.Layers.Count(l => !l.IsBackground) == 1)
+        if (layer.IsInstances && room.Layers.Count(l => l.IsInstances) == 1)
         {
             ShowStatus("A sala precisa de pelo menos uma camada de instâncias.");
             return;

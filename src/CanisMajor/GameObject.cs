@@ -169,7 +169,7 @@ public abstract class GameObject
     {
         var amount = dx != 0 ? dx : dy;
         if (amount == 0) return false;
-        if (Collide(solid, dx, dy) is null)
+        if (!Blocked(solid, dx, dy))
         {
             X += dx;
             Y += dy;
@@ -180,12 +180,31 @@ public abstract class GameObject
         while (MathF.Abs(step + sign) <= MathF.Abs(amount))
         {
             var (nx, ny) = dx != 0 ? (step + sign, 0f) : (0f, step + sign);
-            if (Collide(solid, nx, ny) is not null) break;
+            if (Blocked(solid, nx, ny)) break;
             step += sign;
         }
         if (dx != 0) X += step; else Y += step;
         return true;
     }
+
+    // Bloqueia o movimento: um objeto do tipo, ou um tile sólido da camada de tiles com esse nome.
+    // Confere o caminho inteiro, do primeiro passo até a chegada: uma queda rápida não atravessa o chão.
+    private bool Blocked(string solid, float dx, float dy)
+    {
+        var first = BBox(MathF.Sign(dx) * MathF.Min(1, MathF.Abs(dx)), MathF.Sign(dy) * MathF.Min(1, MathF.Abs(dy)));
+        var last = BBox(dx, dy);
+        var box = (MathF.Min(first.Left, last.Left), MathF.Min(first.Top, last.Top), MathF.Max(first.Right, last.Right), MathF.Max(first.Bottom, last.Bottom));
+        foreach (var other in Runtime.InstancesOf(solid))
+        {
+            if (ReferenceEquals(other, this)) continue;
+            var b = other.BBox();
+            if (box.Item1 < b.Right && box.Item3 > b.Left && box.Item2 < b.Bottom && box.Item4 > b.Top) return true;
+        }
+        return Runtime.TilesBlock(solid, box);
+    }
+
+    /// <summary>Se eu encostaria num tile sólido da camada de tiles se andasse dx, dy.</summary>
+    public bool TouchingTiles(string layer, float dx = 0, float dy = 0) => Runtime.TilesBlock(layer, BBox(dx, dy));
 
     public float DistanceTo(GameObject other) => MathF.Sqrt((other.X - X) * (other.X - X) + (other.Y - Y) * (other.Y - Y));
 

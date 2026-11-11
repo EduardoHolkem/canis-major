@@ -67,6 +67,7 @@ public partial class MainWindow
     {
         PickParentFolder = PickParentFolderAsync;
         RoomView.SpriteFor = LoadSprite;
+        RoomView.TilesetFor = LoadTileset;
         RoomView.Changed += WriteRoom;
         RoomView.SelectionChanged += BuildInspector;
         RoomView.UndoRequested += UndoRoom;
@@ -174,6 +175,10 @@ public partial class MainWindow
     // O script (.cs) abre no código, e o botão mostra a ficha. A ficha sozinha (.json) já abre como ficha.
     private bool ShowsObject => IsObjectDocument && (IsObjectJson(ActiveDocument!.FullPath) ? !_roomAsCode.Contains(ActiveDocument.FullPath) : _roomAsCode.Contains(ActiveDocument.FullPath));
 
+    private bool IsTilesetDocument => ActiveDocument is { IsImage: false } document && !IsDiffOpen && GameFiles.KindOf(RootFolder, document.FullPath) == "tileset";
+
+    private bool ShowsTileset => IsTilesetDocument && !_roomAsCode.Contains(ActiveDocument!.FullPath);
+
     private static bool IsObjectJson(string path) => string.Equals(Path.GetExtension(path), ".json", StringComparison.OrdinalIgnoreCase);
 
     private bool ShowsSprite => ActiveDocument is { IsImage: true } document && !IsDiffOpen && GameFiles.IsSprite(RootFolder, document.FullPath);
@@ -184,9 +189,13 @@ public partial class MainWindow
         var room = ShowsRoom;
         var sprite = ShowsSprite;
         var objectForm = ShowsObject;
-        RoomCodeToggle.IsVisible = IsRoomDocument || IsObjectDocument;
-        RoomCodeToggle.Content = IsObjectDocument ? (objectForm ? (IsObjectJson(ActiveDocument!.FullPath) ? "JSON" : "Script") : "Objeto") : room ? "Código" : "Sala";
-        GameHost.IsVisible = room || sprite || objectForm;
+        var tileset = ShowsTileset;
+        RoomCodeToggle.IsVisible = IsRoomDocument || IsObjectDocument || IsTilesetDocument;
+        RoomCodeToggle.Content = IsTilesetDocument ? (tileset ? "JSON" : "Tileset") : IsObjectDocument ? (objectForm ? (IsObjectJson(ActiveDocument!.FullPath) ? "JSON" : "Script") : "Objeto") : room ? "Código" : "Sala";
+        GameHost.IsVisible = room || sprite || objectForm || tileset;
+        TilesetHost.IsVisible = tileset;
+        if (tileset)
+            ShowTileset();
         ObjectView.IsVisible = objectForm;
         RoomHint.IsVisible = room;
         SpriteEditor.IsVisible = sprite;
@@ -218,7 +227,7 @@ public partial class MainWindow
 
     public void ToggleRoomCode()
     {
-        if (!IsRoomDocument && !IsObjectDocument)
+        if (!IsRoomDocument && !IsObjectDocument && !IsTilesetDocument)
             return;
         var path = ActiveDocument!.FullPath;
         if (!_roomAsCode.Remove(path))
@@ -400,6 +409,8 @@ public partial class MainWindow
             BuildSpriteInspector();
         else if (ShowsObject)
             BuildObjectInspector();
+        else if (ShowsTileset)
+            BuildTilesetInspector();
 
         if (focusedTag is not null && FindInspectorControl(focusedTag) is { } again)
             Dispatcher.UIThread.Post(() => again.Focus());
@@ -455,7 +466,7 @@ public partial class MainWindow
             AddRow("Objeto", picker);
             AddNumberField("X", instance.X, "i.x", value => { instance.X = value; RoomView.InvalidateVisual(); WriteRoom(); });
             AddNumberField("Y", instance.Y, "i.y", value => { instance.Y = value; RoomView.InvalidateVisual(); WriteRoom(); });
-            var layerNames = room.EffectiveLayers.Where(l => !l.IsBackground).Select(l => l.Name).ToList();
+            var layerNames = room.EffectiveLayers.Where(l => l.IsInstances).Select(l => l.Name).ToList();
             if (layerNames.Count > 1)
             {
                 var current = room.LayerOf(instance)?.Name ?? layerNames[0];
@@ -781,6 +792,7 @@ public partial class MainWindow
     private void OnNewObject(object? sender, RoutedEventArgs e) => _ = CreateResourceAsync("object");
     private void OnNewSprite(object? sender, RoutedEventArgs e) => _ = CreateResourceAsync("sprite");
     private void OnNewShader(object? sender, RoutedEventArgs e) => _ = CreateResourceAsync("shader");
+    private void OnNewTileset(object? sender, RoutedEventArgs e) => _ = CreateResourceAsync("tileset");
 
     public async Task CreateResourceAsync(string kind)
     {
@@ -792,6 +804,7 @@ public partial class MainWindow
             "object" => ("Novo objeto", "O nome vira a classe em objects/, e as salas usam esse nome para colocar o objeto.", "Objeto"),
             "sprite" => ("Novo sprite", "Um PNG de 16 por 16 em sprites/, pronto para desenhar no seu editor de imagens.", "sprite"),
             "shader" => ("Novo shader", "Um arquivo WGSL em shaders/. Num objeto, Shader = \"nome\" aplica no sprite dele.", "efeito"),
+            "tileset" => ("Novo tileset", "Uma imagem de sprites/ cortada em tiles, para pintar salas. Escolha a imagem e o tamanho do tile no Inspetor.", "tiles"),
             _ => throw new ArgumentException(kind),
         };
         var suggestion = stem;
@@ -974,6 +987,7 @@ public partial class MainWindow
         actions.Add(("Novo objeto", "objects/", () => _ = CreateResourceAsync("object")));
         actions.Add(("Novo sprite", "sprites/", () => _ = CreateResourceAsync("sprite")));
         actions.Add(("Novo shader", "shaders/", () => _ = CreateResourceAsync("shader")));
+        actions.Add(("Novo tileset", "tilesets/", () => _ = CreateResourceAsync("tileset")));
         actions.Add(("Exportar jogo", "Pasta e .zip em export/", () => _ = ExportGameAsync()));
         actions.Add((IsGameView ? "Mostrar os arquivos" : "Mostrar os recursos do jogo", "Lista ao lado", () => SetGameView(!IsGameView)));
         if (IsRoomDocument)

@@ -75,7 +75,7 @@ public partial class MainWindow
     private void ShowDocumentSurface()
     {
         var image = ActiveDocument is { IsImage: true };
-        CodeEditor.IsVisible = ActiveDocument is not null && !image && !IsDiffOpen && !ShowsRoom && !ShowsObject;
+        CodeEditor.IsVisible = ActiveDocument is not null && !image && !IsDiffOpen && !ShowsRoom && !ShowsObject && !ShowsTileset;
         CodeEditor.IsReadOnly = image;
         ImageHost.IsVisible = image && !IsDiffOpen && !ShowsSprite;
         UpdateSvgPane();

@@ -92,6 +92,7 @@
                                         <MenuItem Header="Novo objeto" Click="OnNewObject" />
                                         <MenuItem Header="Novo sprite" Click="OnNewSprite" />
                                         <MenuItem Header="Novo shader" Click="OnNewShader" />
+                                        <MenuItem Header="Novo tileset" Click="OnNewTileset" />
                                         <Separator />
                                         <MenuItem Header="Exportar jogo" Click="OnExportGame" />
                                     </MenuFlyout>
@@ -465,6 +466,10 @@
                                     <g:RoomCanvas x:Name="RoomView" IsVisible="False" AutomationProperties.Name="Sala" />
                                     <g:SpriteView x:Name="SpriteEditor" IsVisible="False" AutomationProperties.Name="Sprite" />
                                     <!-- Ficha do objeto: o sprite grande e o resumo dos componentes. O Inspetor ao lado edita. -->
+                                    <!-- Tileset: a imagem com a grade; o clique marca os tiles sólidos. -->
+                                    <ScrollViewer x:Name="TilesetHost" IsVisible="False" HorizontalScrollBarVisibility="Auto">
+                                        <g:TilesetView x:Name="TilesetEditor" EditSolid="True" Margin="24" HorizontalAlignment="Left" VerticalAlignment="Top" AutomationProperties.Name="Tileset" />
+                                    </ScrollViewer>
                                     <ScrollViewer x:Name="ObjectView" IsVisible="False" HorizontalScrollBarVisibility="Disabled">
                                         <StackPanel x:Name="ObjectSummary" Margin="32,24" Spacing="10" MaxWidth="560" HorizontalAlignment="Left" />
                                     </ScrollViewer>

@@ -7,6 +7,7 @@ using Avalonia.Media.Imaging;
 using CanisEditor.Theming;
 using LayerData = CanisMajor.LayerData;
 using RoomLayers = CanisMajor.RoomLayers;
+using TilesetData = CanisMajor.TilesetData;
 
 namespace CanisEditor.Game;
 
@@ -29,7 +30,7 @@ public sealed class RoomCanvas : Control
     private static readonly Cursor MoveCursor = new(StandardCursorType.SizeAll);
     private static readonly Typeface LabelFace = new("Inter", FontStyle.Normal, FontWeight.Medium);
 
-    private enum Gesture { None, Move, Paint, Pan }
+    private enum Gesture { None, Move, Paint, Pan, TilePaint, TileErase }
 
     private RoomModel? _model;
     private Gesture _gesture;
@@ -77,6 +78,31 @@ public sealed class RoomCanvas : Control
 
     // Só a camada ativa recebe cliques, como no GameMaker. Desligado, qualquer instância visível se escolhe.
     public bool LockToActiveLayer { get; set; }
+
+    // Tiles: o tileset pelo nome, o tile do pincel e se mostra os tiles sólidos em vermelho.
+    public Func<string, TilesetData?> TilesetFor { get; set; } = _ => null;
+    public int TileBrush { get; set; }
+    public bool ShowCollision { get; set; }
+
+    // Com uma camada de tiles ativa, o clique pinta tiles em vez de pôr objetos.
+    private LayerData? ActiveTileLayer => _model?.FindLayer(ActiveLayer) is { IsTiles: true } layer ? layer : null;
+
+    // Pinta (ou apaga, com -1) o tile embaixo do ponto. Devolve se mudou alguma coisa.
+    public bool PaintTile(Point room, int id)
+    {
+        if (ActiveTileLayer is not { } layer || layer.Tileset is null || TilesetFor(layer.Tileset) is not { } set)
+            return false;
+        var col = (int)Math.Floor(room.X / set.TileWidth);
+        var row = (int)Math.Floor(room.Y / set.TileHeight);
+        if (col < 0 || row < 0 || col >= layer.Columns || layer.TileAt(col, row) == id)
+            return false;
+        if (id < 0 && row * layer.Columns + col >= layer.Tiles.Count)
+            return false;
+        layer.SetTile(col, row, id);
+        _changedInGesture = true;
+        InvalidateVisual();
+        return true;
+    }
 
     // O tamanho da tela do jogo, desenhado como um retângulo para mostrar o que a câmera vê.
     public Size View { get; set; } = new(480, 270);
@@ -299,6 +325,16 @@ public sealed class RoomCanvas : Control
             return;
         }
 
+        // Camada de tiles ativa: esquerdo pinta, direito apaga, e arrastar continua.
+        if (ActiveTileLayer is not null && (point.Properties.IsLeftButtonPressed || point.Properties.IsRightButtonPressed))
+        {
+            _gesture = point.Properties.IsRightButtonPressed ? Gesture.TileErase : Gesture.TilePaint;
+            PaintTile(room, _gesture == Gesture.TileErase ? -1 : TileBrush);
+            e.Pointer.Capture(this);
+            e.Handled = true;
+            return;
+        }
+
         var hit = HitTest(room);
         if (point.Properties.IsRightButtonPressed)
         {
@@ -358,6 +394,12 @@ public sealed class RoomCanvas : Control
                 break;
             case Gesture.Paint:
                 PlaceAt(room, snap);
+                break;
+            case Gesture.TilePaint:
+                PaintTile(room, TileBrush);
+                break;
+            case Gesture.TileErase:
+                PaintTile(room, -1);
                 break;
         }
         InvalidateVisual();
@@ -477,7 +519,7 @@ public sealed class RoomCanvas : Control
         using (context.PushTransform(Matrix.CreateScale(_zoom, _zoom) * Matrix.CreateTranslation(_pan.X, _pan.Y)))
         {
             // Fundos e instâncias numa pilha só, como no jogo.
-            var backgrounds = _model.Layers.Where(l => l.IsBackground && l.Visible).OrderBy(l => l.Depth).ToList();
+            var backgrounds = _model.Layers.Where(l => (l.IsBackground || l.IsTiles) && l.Visible).OrderBy(l => l.Depth).ToList();
             var next = 0;
             foreach (var index in DrawOrder())
             {
@@ -490,6 +532,7 @@ public sealed class RoomCanvas : Control
             while (next < backgrounds.Count)
                 DrawBackgroundLayer(context, backgrounds[next++]);
             DrawGhost(context);
+            DrawTileGhost(context);
         }
 
         // Marcadores, câmera e seleção ficam com o mesmo traço em qualquer zoom.
@@ -559,8 +602,53 @@ public sealed class RoomCanvas : Control
     }
 
     // Uma camada de fundo: a cor na sala inteira e o sprite a partir do canto, repetido se pedido.
+    private void DrawTileLayer(DrawingContext context, LayerData layer)
+    {
+        if (layer.Tileset is null || TilesetFor(layer.Tileset) is not { } set || SpriteFor(set.Sprite) is not { } image)
+            return;
+        var columnsInImage = Math.Max(1, image.PixelWidth / Math.Max(1, set.TileWidth));
+        var rowsInImage = Math.Max(1, image.PixelHeight / Math.Max(1, set.TileHeight));
+        // O Bitmap pode ter outro tamanho que o PNG (nos testes, 1 pixel): a conta da origem usa a proporção.
+        var sx = image.Bitmap.Size.Width / Math.Max(1, image.PixelWidth);
+        var sy = image.Bitmap.Size.Height / Math.Max(1, image.PixelHeight);
+        var dim = ActiveTileLayer is { } active && !ReferenceEquals(active, layer) && LockToActiveLayer ? 0.45 : 1;
+        var solid = new SolidColorBrush(Color.FromArgb(110, 255, 70, 70));
+        using (context.PushOpacity(dim))
+        {
+            for (var r = 0; r < layer.Rows; r++)
+            {
+                for (var c = 0; c < layer.Columns; c++)
+                {
+                    var id = layer.TileAt(c, r);
+                    if (id < 0 || id / columnsInImage >= rowsInImage)
+                        continue;
+                    var source = new Rect(id % columnsInImage * set.TileWidth * sx, id / columnsInImage * set.TileHeight * sy, set.TileWidth * sx, set.TileHeight * sy);
+                    var dest = new Rect(c * set.TileWidth, r * set.TileHeight, set.TileWidth, set.TileHeight);
+                    context.DrawImage(image.Bitmap, source, dest);
+                    if (ShowCollision && set.Solid.Contains(id))
+                        context.FillRectangle(solid, dest);
+                }
+            }
+        }
+    }
+
+    // A prévia do tile do pincel na célula embaixo do mouse.
+    private void DrawTileGhost(DrawingContext context)
+    {
+        if (ActiveTileLayer is not { Tileset: { } name } || _hover is not { } hover || _spaceHeld || TilesetFor(name) is not { } set)
+            return;
+        var room = ToRoom(hover);
+        var cell = new Rect(Math.Floor(room.X / set.TileWidth) * set.TileWidth, Math.Floor(room.Y / set.TileHeight) * set.TileHeight, set.TileWidth, set.TileHeight);
+        context.DrawRectangle(new Pen(new SolidColorBrush(Color.FromArgb(200, 130, 170, 255)), 1 / _zoom), cell);
+    }
+
     private void DrawBackgroundLayer(DrawingContext context, LayerData layer)
     {
+        if (layer.IsTiles)
+        {
+            DrawTileLayer(context, layer);
+            return;
+        }
         if (_model is null)
             return;
         var room = new Rect(0, 0, _model.Width, _model.Height);

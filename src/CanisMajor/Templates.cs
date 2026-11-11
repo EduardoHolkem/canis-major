@@ -61,7 +61,7 @@ public static class Templates
         var root = Path.GetFullPath(folder);
         if (Directory.Exists(root) && Directory.EnumerateFileSystemEntries(root).Any())
             throw new IOException($"A pasta {root} já existe e não está vazia.");
-        foreach (var sub in new[] { "sprites", "objects", "rooms", "shaders", "sounds" })
+        foreach (var sub in new[] { "sprites", "objects", "rooms", "shaders", "sounds", "tilesets" })
             Directory.CreateDirectory(Path.Combine(root, sub));
         var ns = Namespace(name);
         var info = new ProjectInfo { Name = name, Engine = Engine.Version };
@@ -90,7 +90,7 @@ public static class Templates
 
               <ItemGroup>
                 <ProjectReference Include="$(CanisMajorRoot)\src\CanisMajor\CanisMajor.csproj" />
-                <Content Include="projeto.json;sprites\**;rooms\**;shaders\**;sounds\**;objects\*.json" CopyToOutputDirectory="PreserveNewest" />
+                <Content Include="projeto.json;sprites\**;rooms\**;shaders\**;sounds\**;objects\*.json;tilesets\**" CopyToOutputDirectory="PreserveNewest" />
               </ItemGroup>
 
             </Project>

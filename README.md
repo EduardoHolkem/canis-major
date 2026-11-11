@@ -149,6 +149,16 @@ No arquivo, as camadas ficam em `layers`, e a instância diz a camada em `layer`
 
 No código, `Game.Layer("Ceu")` devolve a camada (dá para mudar `Visible`, `Depth`, `Color` e `Parallax` durante o jogo), e `Game.SetLayerVisible("Frente", false)` esconde a camada e as instâncias dela.
 
+## Tilesets e tiles
+
+Um **tileset** (`tilesets/nome.json`) é uma imagem de `sprites/` cortada numa grade. Crie pelo **+ › Novo tileset**, escolha a imagem e o tamanho do tile no Inspetor e clique nos tiles para marcar os **sólidos** (ficam em vermelho). O tile 0 é o do canto de cima à esquerda, e a conta segue pela linha.
+
+Na sala, **+ Tiles** cria uma camada de tiles. Com ela ativa, o Inspetor mostra a paleta: clique no tile para pôr no pincel. Na sala, o botão esquerdo pinta, o direito apaga, e arrastar continua. "Mostrar os tiles sólidos em vermelho" deixa a colisão à vista, e "Ajustar ao tamanho da sala" recalcula as colunas depois de mudar a largura. Uma sala pode ter várias camadas de tiles (chão, paredes, decoração na frente do personagem), cada uma na sua profundidade.
+
+- **Colisão:** `Move(dx, dy, solid: "Chao")` para nos tiles sólidos da camada "Chao", do mesmo jeito que para em objetos. O componente `Motion` aceita o nome da camada em `Solid`. O movimento confere o caminho inteiro, então uma queda rápida não atravessa o chão.
+- **No código:** `TouchingTiles("Chao", 0, 1)` diz se está pisando no chão, `Game.TileAt("Chao", x, y)` lê o tile num ponto e `Game.SetTile("Chao", x, y, -1)` apaga (para quebrar blocos ou abrir passagens).
+- Só os tiles que a câmera vê são desenhados, então mapas grandes continuam leves.
+
 ## Um shader
 
 Em `shaders/nome.wgsl`, escreva só a função `effect`. A engine completa o resto:

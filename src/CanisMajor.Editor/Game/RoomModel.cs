@@ -175,6 +175,15 @@ public sealed class RoomModel
         if (layer.TileX) json["tile_x"] = true;
         if (layer.TileY) json["tile_y"] = true;
         if (layer.Parallax != 0) json["parallax"] = layer.Parallax;
+        if (layer.IsTiles)
+        {
+            if (layer.Tileset is not null) json["tileset"] = layer.Tileset;
+            json["columns"] = layer.Columns;
+            // Linhas vazias no fim não vão para o arquivo.
+            var count = layer.Tiles.Count;
+            while (count > 0 && layer.Tiles[count - 1] < 0) count--;
+            json["tiles"] = new JsonArray(layer.Tiles.Take(count).Select(t => (JsonNode?)JsonValue.Create(t)).ToArray());
+        }
         return json;
     }
 }
