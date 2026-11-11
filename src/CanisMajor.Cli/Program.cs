@@ -1,6 +1,7 @@
 using CanisMajor;
 
 // cm new <pasta> [--name "Meu jogo"] [--template exemplo|vazio]
+// cm export [pasta] [--sem-dotnet]
 // cm version
 
 static string EngineRoot()
@@ -17,6 +18,7 @@ if (args.Length == 0 || args[0] is "-h" or "--help" or "help")
         Canis Major
 
           cm new <pasta> [--name "Meu jogo"] [--template exemplo|vazio]   cria um projeto de jogo
+          cm export [pasta] [--sem-dotnet]                               exporta o jogo para Windows (pasta e .zip)
           cm version                                                     mostra a versão
 
         Para jogar: dotnet run --project <pasta do jogo>
@@ -51,6 +53,22 @@ switch (args[0])
             Console.Error.WriteLine($"Erro: {e.Message}");
             return 1;
         }
+    case "export":
+    {
+        var gameFolder = args.Skip(1).FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal)) ?? Environment.CurrentDirectory;
+        try
+        {
+            var root = GameProject.Find(gameFolder) ?? throw new GameException($"Esta pasta não tem um projeto.json: {Path.GetFullPath(gameFolder)}");
+            // --sem-dotnet: menor, mas quem joga precisa do .NET 10 instalado.
+            var plan = GameExport.Plan(root, selfContained: !args.Contains("--sem-dotnet"));
+            return GameExport.Run(plan, Console.WriteLine);
+        }
+        catch (Exception e) when (e is GameException or IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        {
+            Console.Error.WriteLine($"Erro: {e.Message}");
+            return 1;
+        }
+    }
     default:
         Console.Error.WriteLine($"Comando desconhecido: {string.Join(' ', args)}. Use: cm help");
         return 1;

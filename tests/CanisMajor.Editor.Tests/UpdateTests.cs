@@ -36,6 +36,7 @@ public class UpdateTests
                     Downloaded.Add(version.Tag);
                     return DownloadStep?.Invoke(progress) ?? Task.FromResult(DownloadResult);
                 },
+                CanSelfUpdate = () => true,
                 RunInstaller = path =>
                 {
                     Installers.Add(path);
@@ -55,7 +56,7 @@ public class UpdateTests
         public List<string> Opened { get; } = [];
         public bool OpenResult { get; set; } = true;
         public List<string> Downloaded { get; } = [];
-        public string? DownloadResult { get; set; } = @"C:\atualizacao\CanisMajor-Setup.exe";
+        public string? DownloadResult { get; set; } = @"C:\atualizacao\CanisMajor-0.7.0-win-x64.zip";
         public Func<IProgress<double>, Task<string?>>? DownloadStep { get; set; }
         public List<string> Installers { get; } = [];
         public bool InstallerResult { get; set; } = true;
@@ -389,7 +390,7 @@ public class UpdateTests
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal(["v0.1.0-alpha.2"], fixture.Downloaded);
-        Assert.Equal([@"C:\atualizacao\CanisMajor-Setup.exe"], fixture.Installers);
+        Assert.Equal([@"C:\atualizacao\CanisMajor-0.7.0-win-x64.zip"], fixture.Installers);
         Assert.False(fixture.Window.IsVisible);
     }
 
@@ -444,7 +445,7 @@ public class UpdateTests
     }
 
     [AvaloniaFact]
-    public async Task Instalador_que_nao_abre_deixa_a_sirius_aberta()
+    public async Task Pacote_que_nao_serve_deixa_o_editor_aberto()
     {
         using var fixture = Pending();
         fixture.InstallerResult = false;
@@ -452,7 +453,7 @@ public class UpdateTests
         await fixture.Window.InstallUpdateAsync(AppVersion.Parse("v0.1.0-alpha.2")!);
 
         Assert.True(fixture.Window.IsVisible);
-        Assert.Contains("instalador", fixture.Window.StatusText);
+        Assert.Contains("pacote baixado", fixture.Window.StatusText);
         Assert.True(fixture.Window.IsUpdateNoticeVisible);
     }
 
@@ -479,40 +480,40 @@ public class UpdateTests
 
     private const string Hash = "6d752e3c4d433d9e4d4e0178900902ba164f452614aad0cb90cd1227c1a4be85";
 
-    private static string Release(string name = "CanisMajor-0.7.0-Setup.exe", string url = "https://github.com/EduardoHolkem/canis-major/releases/download/v0.7.0/CanisMajor-0.7.0-Setup.exe",
+    private static string Release(string name = "CanisMajor-0.7.0-win-x64.zip", string url = "https://github.com/EduardoHolkem/canis-major/releases/download/v0.7.0/CanisMajor-0.7.0-win-x64.zip",
         string? digest = "sha256:" + Hash, long size = 42541308) =>
         $$"""{"assets":[{"name":"CanisMajor.zip","browser_download_url":"https://github.com/EduardoHolkem/canis-major/releases/download/v0.7.0/CanisMajor.zip","size":1,"digest":"sha256:{{Hash}}"},{"name":"{{name}}","browser_download_url":"{{url}}","size":{{size}}{{(digest is null ? "" : $",\"digest\":\"{digest}\"")}}}]}""";
 
     [Fact]
-    public void Acha_o_instalador_da_versao_com_o_registro_do_github()
+    public void Acha_o_pacote_da_versao_com_o_registro_do_github()
     {
         var package = UpdateDownload.ParsePackage(Release(), V("v0.7.0"));
 
         Assert.NotNull(package);
-        Assert.Equal("CanisMajor-0.7.0-Setup.exe", package.Name);
+        Assert.Equal("CanisMajor-0.7.0-win-x64.zip", package.Name);
         Assert.Equal(42541308, package.Size);
         Assert.Equal(Hash, package.Sha256);
     }
 
     [Theory]
-    [InlineData("https://github.com/outra-pessoa/Sirius/releases/download/v0.7.0/CanisMajor-0.7.0-Setup.exe", "sha256:" + Hash, 10)]
-    [InlineData("https://github.com/EduardoHolkem/canis-major/releases/download/v0.6.0/CanisMajor-0.7.0-Setup.exe", "sha256:" + Hash, 10)]
-    [InlineData("http://github.com/EduardoHolkem/canis-major/releases/download/v0.7.0/CanisMajor-0.7.0-Setup.exe", "sha256:" + Hash, 10)]
-    [InlineData("https://github.com/EduardoHolkem/canis-major/releases/download/v0.7.0/CanisMajor-0.7.0-Setup.exe", null, 10)]
-    [InlineData("https://github.com/EduardoHolkem/canis-major/releases/download/v0.7.0/CanisMajor-0.7.0-Setup.exe", "md5:abc", 10)]
-    [InlineData("https://github.com/EduardoHolkem/canis-major/releases/download/v0.7.0/CanisMajor-0.7.0-Setup.exe", "sha256:" + Hash, 0)]
-    [InlineData("https://github.com/EduardoHolkem/canis-major/releases/download/v0.7.0/CanisMajor-0.7.0-Setup.exe", "sha256:" + Hash, 999_999_999)]
-    public void Recusa_instalador_de_fora_ou_sem_registro(string url, string? digest, long size) =>
+    [InlineData("https://github.com/outra-pessoa/Sirius/releases/download/v0.7.0/CanisMajor-0.7.0-win-x64.zip", "sha256:" + Hash, 10)]
+    [InlineData("https://github.com/EduardoHolkem/canis-major/releases/download/v0.6.0/CanisMajor-0.7.0-win-x64.zip", "sha256:" + Hash, 10)]
+    [InlineData("http://github.com/EduardoHolkem/canis-major/releases/download/v0.7.0/CanisMajor-0.7.0-win-x64.zip", "sha256:" + Hash, 10)]
+    [InlineData("https://github.com/EduardoHolkem/canis-major/releases/download/v0.7.0/CanisMajor-0.7.0-win-x64.zip", null, 10)]
+    [InlineData("https://github.com/EduardoHolkem/canis-major/releases/download/v0.7.0/CanisMajor-0.7.0-win-x64.zip", "md5:abc", 10)]
+    [InlineData("https://github.com/EduardoHolkem/canis-major/releases/download/v0.7.0/CanisMajor-0.7.0-win-x64.zip", "sha256:" + Hash, 0)]
+    [InlineData("https://github.com/EduardoHolkem/canis-major/releases/download/v0.7.0/CanisMajor-0.7.0-win-x64.zip", "sha256:" + Hash, 999_999_999)]
+    public void Recusa_pacote_de_fora_ou_sem_registro(string url, string? digest, long size) =>
         Assert.Null(UpdateDownload.ParsePackage(Release(url: url, digest: digest, size: size), V("v0.7.0")));
 
     [Theory]
-    [InlineData("..\\CanisMajor-Setup.exe")]
+    [InlineData("..\\CanisMajor-0.7.0-win-x64.zip")]
     [InlineData("CanisMajor-0.7.0.zip")]
     public void Recusa_nome_estranho(string name) =>
         Assert.Null(UpdateDownload.ParsePackage(Release(name: name.Replace("\\", "\\\\")), V("v0.7.0")));
 
     private static UpdatePackage Package(byte[] content) =>
-        new("CanisMajor-9.9.9-Setup.exe", new Uri("https://github.com/x"), content.Length, Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(content)));
+        new("CanisMajor-9.9.9-win-x64.zip", new Uri("https://github.com/x"), content.Length, Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(content)));
 
     private static Func<Uri, CancellationToken, Task<Stream>> Serve(byte[] content, Action? opened = null) => (_, _) =>
     {
@@ -524,13 +525,13 @@ public class UpdateTests
     public async Task Baixa_e_confere_o_arquivo()
     {
         using var folder = new TempFolder();
-        var old = folder.File("CanisMajor-0.1.0-Setup.exe", "velho");
+        var old = folder.File("CanisMajor-0.1.0-win-x64.zip", "velho");
         var content = "instalador"u8.ToArray();
         var reports = new List<double>();
 
         var path = await UpdateDownload.DownloadAsync(Package(content), folder.Path, Serve(content), new SyncProgress(reports.Add), CancellationToken.None);
 
-        Assert.Equal(Path.Combine(folder.Path, "CanisMajor-9.9.9-Setup.exe"), path);
+        Assert.Equal(Path.Combine(folder.Path, "CanisMajor-9.9.9-win-x64.zip"), path);
         Assert.Equal(content, File.ReadAllBytes(path!));
         Assert.False(File.Exists(old));
         Assert.Equal(1, reports.Last());
@@ -564,8 +565,87 @@ public class UpdateTests
     }
 
     [Fact]
-    public void Instalador_roda_em_silencio_e_reabre_a_sirius() =>
-        Assert.Equal("/SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /LANG=ptbr /relaunch=1", UpdateDownload.InstallerArguments);
+    public void Pacote_instalado_e_achado_pela_pasta_do_editor()
+    {
+        using var install = new TempFolder();
+        install.File(UpdateDownload.PackageMarker, "{}");
+        var editor = install.File(Path.Combine("editor", "CanisMajor.Editor.exe"), "");
+
+        Assert.Equal(install.Path, UpdateDownload.PackageRoot(Path.GetDirectoryName(editor)!));
+        using var repo = new TempFolder();
+        Assert.Null(UpdateDownload.PackageRoot(repo.Path));
+    }
+
+    // Um pacote falso da versão nova, com o que o script troca e o que ele preserva.
+    private static string FakePackage(TempFolder folder, string version)
+    {
+        var stage = Path.Combine(folder.Path, "stage");
+        Directory.CreateDirectory(Path.Combine(stage, "editor"));
+        Directory.CreateDirectory(Path.Combine(stage, "src", "CanisMajor"));
+        Directory.CreateDirectory(Path.Combine(stage, "native"));
+        Directory.CreateDirectory(Path.Combine(stage, "examples", "Exemplo"));
+        File.WriteAllText(Path.Combine(stage, UpdateDownload.PackageMarker), $$"""{"version":"{{version}}"}""");
+        File.WriteAllText(Path.Combine(stage, "editor", "CanisMajor.Editor.exe"), version);
+        File.WriteAllText(Path.Combine(stage, "src", "CanisMajor", "Game.cs"), version);
+        File.WriteAllText(Path.Combine(stage, "native", "canis_core.dll"), version);
+        File.WriteAllText(Path.Combine(stage, "examples", "Exemplo", "projeto.json"), version);
+        var zip = Path.Combine(folder.Path, $"CanisMajor-{version}-win-x64.zip");
+        System.IO.Compression.ZipFile.CreateFromDirectory(stage, zip);
+        return zip;
+    }
+
+    [Fact]
+    public void Pacote_sem_editor_nao_serve()
+    {
+        using var folder = new TempFolder();
+        var zip = Path.Combine(folder.Path, "CanisMajor-9.9.9-win-x64.zip");
+        var stage = Path.Combine(folder.Path, "stage");
+        Directory.CreateDirectory(stage);
+        File.WriteAllText(Path.Combine(stage, UpdateDownload.PackageMarker), "{}");
+        System.IO.Compression.ZipFile.CreateFromDirectory(stage, zip);
+
+        Assert.Null(UpdateDownload.Unpack(zip, folder.Path));
+    }
+
+    [Fact]
+    public async Task Script_troca_o_pacote_e_preserva_o_exemplo()
+    {
+        using var install = new TempFolder();
+        install.File(UpdateDownload.PackageMarker, """{"version":"0.3.0"}""");
+        var editor = install.File(Path.Combine("editor", "CanisMajor.Editor.exe"), "0.3.0");
+        install.File(Path.Combine("editor", "velho.dll"), "sai");
+        install.File(Path.Combine("src", "CanisMajor", "Game.cs"), "0.3.0");
+        install.File(Path.Combine("examples", "Exemplo", "projeto.json"), "meu jogo mudado");
+        using var download = new TempFolder();
+        var zip = FakePackage(download, "0.4.0");
+
+        // O "editor" que precisa fechar antes da troca é um processo que já terminou.
+        using var gone = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe", "/c exit") { CreateNoWindow = true, UseShellExecute = false })!;
+        gone.WaitForExit();
+        using var script = UpdateDownload.StartUpdate(zip, Path.GetDirectoryName(editor)!, gone.Id, launch: false);
+        Assert.NotNull(script);
+        await script.WaitForExitAsync(new CancellationTokenSource(TimeSpan.FromSeconds(60)).Token);
+
+        Assert.StartsWith("atualizado", File.ReadAllText(Path.Combine(download.Path, "atualizar.log")));
+        Assert.Equal("0.4.0", File.ReadAllText(editor));
+        Assert.False(File.Exists(Path.Combine(install.Path, "editor", "velho.dll")));
+        Assert.Equal("0.4.0", File.ReadAllText(Path.Combine(install.Path, "native", "canis_core.dll")));
+        Assert.Contains("0.4.0", File.ReadAllText(Path.Combine(install.Path, UpdateDownload.PackageMarker)));
+        Assert.Equal("meu jogo mudado", File.ReadAllText(Path.Combine(install.Path, "examples", "Exemplo", "projeto.json")));
+    }
+
+    [AvaloniaFact]
+    public async Task Rodando_do_repositorio_manda_para_a_pagina_da_versao()
+    {
+        using var fixture = Pending();
+        fixture.Window.CanSelfUpdate = () => false;
+
+        await fixture.Window.InstallUpdateAsync(V("v0.1.0-alpha.2"));
+
+        Assert.Empty(fixture.Downloaded);
+        Assert.Single(fixture.Opened);
+        Assert.Contains("git pull", fixture.Window.StatusText);
+    }
 
     // Progress<T> manda para a thread da interface. Aqui o relato precisa chegar na hora.
     private sealed class SyncProgress(Action<double> report) : IProgress<double>

@@ -1,6 +1,6 @@
 [package]
 name = "canis_core"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "Núcleo nativo do Canis Major: janela, renderização wgpu, texto, malhas 3D e som."
 license = "MIT"
@@ -23,3 +23,5 @@ rodio = { version = "0.20", default-features = false, features = ["wav", "vorbis
 opt-level = 3
 lto = "thin"
 codegen-units = 4
+# Sem os símbolos de depuração: a DLL vai junto com cada jogo exportado.
+strip = "symbols"

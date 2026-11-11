@@ -66,7 +66,7 @@ public static class Templates
         var ns = Namespace(name);
         var info = new ProjectInfo { Name = name, Engine = Engine.Version };
         Write(Path.Combine(root, GameProject.FileName), JsonSerializer.Serialize(info, GameProject.Json));
-        Write(Path.Combine(root, ".gitignore"), "bin/\nobj/\n");
+        Write(Path.Combine(root, ".gitignore"), "bin/\nobj/\nexport/\n");
         Write(Path.Combine(root, "Program.cs"), "return CanisMajor.Engine.Run(args);\n");
 
         // Dentro do repositório da engine, o caminho fica relativo; fora, absoluto.
@@ -96,6 +96,7 @@ public static class Templates
             </Project>
 
             """);
+        GameExport.PrepareProject(Path.Combine(root, ns + ".csproj"));
 
         if (template == "exemplo") Example(root, ns, info);
         else SaveRoom(root, "inicio", new RoomData { Width = info.Width, Height = info.Height });

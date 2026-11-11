@@ -16,4 +16,12 @@
     <Content Include="projeto.json;sprites\**;rooms\**;shaders\**;sounds\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- Ao exportar (cm export ou Exportar jogo no editor): um .exe só, sem janela de console. -->
+  <PropertyGroup Condition="'$(CanisExport)' == 'true'">
+    <OutputType>WinExe</OutputType>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
 </Project>

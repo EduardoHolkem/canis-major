@@ -420,19 +420,25 @@ internal static unsafe class Runtime
     }
 
     /// <summary>Mostra o erro do jogo só com as linhas dos scripts do usuário, no formato arquivo:linha.</summary>
-    public static void PrintUserError(Exception e)
+    public static void PrintUserError(Exception e) => ErrorReport.Show(UserErrorText(e));
+
+    /// <summary>O texto do erro: a mensagem e as chamadas dos scripts do jogo, sem as da engine.</summary>
+    public static string UserErrorText(Exception e)
     {
         while (e is TargetInvocationException { InnerException: { } inner }) e = inner;
-        var err = Console.Error;
-        err.WriteLine($"Erro no jogo: {e.GetType().Name}: {e.Message}");
-        var frames = new StackTrace(e, true).GetFrames()
-            .Where(f => f.GetFileName() != null && f.GetMethod()?.DeclaringType?.Namespace?.StartsWith("CanisMajor", StringComparison.Ordinal) != true)
-            .ToList();
-        if (frames.Count == 0) frames = new StackTrace(e, true).GetFrames().Where(f => f.GetFileName() != null).ToList();
+        var text = new StringBuilder($"Erro no jogo: {e.GetType().Name}: {e.Message}");
+        var all = new StackTrace(e, true).GetFrames();
+        var mine = all.Where(f => f.GetMethod()?.DeclaringType?.Namespace?.StartsWith("CanisMajor", StringComparison.Ordinal) != true).ToList();
+        // No jogo exportado não há arquivo e linha, mas o nome do método ainda ajuda.
+        var frames = mine.Count > 0 ? mine : all.Where(f => f.GetFileName() != null).ToList();
         foreach (var f in frames)
         {
             var m = f.GetMethod();
-            err.WriteLine($"  {m?.DeclaringType?.Name}.{m?.Name}  {f.GetFileName()}:{f.GetFileLineNumber()}");
+            if (m is null) continue;
+            text.Append($"\n  {m.DeclaringType?.Name}.{m.Name}");
+            if (f.GetFileName() is { } file)
+                text.Append($"  {file}:{f.GetFileLineNumber()}");
         }
+        return text.ToString();
     }
 }

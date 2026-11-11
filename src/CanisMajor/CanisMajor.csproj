@@ -6,12 +6,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>CanisMajor</RootNamespace>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <Description>Canis Major: engine de jogos 2D com núcleo em Rust (wgpu) e jogos em C#.</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
-    <!-- Caminho do núcleo compilado pelo Cargo. -->
-    <CanisCoreDll>$(MSBuildThisFileDirectory)..\..\core\target\release\canis_core.dll</CanisCoreDll>
+    <!-- O núcleo pronto que vem no pacote da engine (native\) ou o compilado pelo Cargo, no repositório. -->
+    <CanisCoreDll>$(MSBuildThisFileDirectory)..\..\native\canis_core.dll</CanisCoreDll>
+    <CanisCoreDll Condition="!Exists('$(CanisCoreDll)')">$(MSBuildThisFileDirectory)..\..\core\target\release\canis_core.dll</CanisCoreDll>
   </PropertyGroup>
 
   <ItemGroup>

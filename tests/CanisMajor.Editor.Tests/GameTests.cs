@@ -306,6 +306,31 @@ public class GameTests
         window.Close();
     }
 
+    // Roda o dotnet publish de verdade: leva meio minuto ou mais.
+    [AvaloniaFact]
+    public async Task Exportar_jogo_gera_a_pasta_e_o_zip()
+    {
+        using var temp = new TempFolder();
+        using var settings = new TempFolder();
+        var root = NewGame(temp, "vazio");
+        var window = Open(settings, root);
+
+        await window.ExportGameAsync();
+        var code = await window.TaskFinished.WaitAsync(TimeSpan.FromMinutes(5));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(0, code);
+        Assert.Equal(Path.Combine(root, "export", "Jogo-Legal-0.1.0-win-x64.zip"), window.LastExport);
+        Assert.True(File.Exists(window.LastExport));
+        var folder = Path.Combine(root, "export", "Jogo-Legal-0.1.0-win-x64");
+        Assert.True(File.Exists(Path.Combine(folder, "JogoLegal.exe")));
+        Assert.True(File.Exists(Path.Combine(folder, "canis_core.dll")));
+        Assert.True(File.Exists(Path.Combine(folder, "rooms", "inicio.json")));
+        Assert.True(window.IsDialogOpen);
+        window.AnswerDialog(primary: false);
+        window.Close();
+    }
+
     [AvaloniaFact]
     public async Task Novo_jogo_cria_a_pasta_e_abre_a_sala()
     {

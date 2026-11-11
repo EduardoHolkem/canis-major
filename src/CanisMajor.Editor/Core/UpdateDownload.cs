@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.IO.Compression;
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -7,10 +8,11 @@ using System.Text.RegularExpressions;
 
 namespace CanisEditor.Core;
 
-// O instalador de uma versão, como a Release do GitHub o descreve. Sha256 é o que o GitHub registrou ao receber o arquivo.
+// O pacote de uma versão, como a Release do GitHub o descreve. Sha256 é o que o GitHub registrou ao receber o arquivo.
 public sealed record UpdatePackage(string Name, Uri Url, long Size, string Sha256);
 
-// Atualizar pelo próprio Canis Major: acha o instalador da versão, baixa, confere e o roda em silêncio.
+// Atualizar pelo próprio Canis Major: acha o pacote da versão (CanisMajor-x.y.z-win-x64.zip), baixa, confere,
+// abre numa pasta de espera e deixa um script trocando os arquivos assim que o editor fechar.
 // Não há assinatura digital ainda, então a confiança é a mesma de baixar da página de Releases:
 // só esse endereço é aceito, e o arquivo precisa ser exatamente o que o GitHub registrou.
 public static partial class UpdateDownload
@@ -21,13 +23,16 @@ public static partial class UpdateDownload
     private static readonly TimeSpan LookupTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan DownloadTimeout = TimeSpan.FromMinutes(15);
 
-    // O instalador sai em silêncio, mostrando só o andamento, e abre o Canis Major de novo no fim (relaunch, em sirius.iss).
-    public const string InstallerArguments = "/SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /LANG=ptbr /relaunch=1";
+    // O arquivo que marca a pasta de um pacote instalado. No repositório (git) ele não existe, e lá se atualiza com git pull.
+    public const string PackageMarker = "pacote.json";
 
     private static readonly HttpClient Http = CreateClient();
 
     [GeneratedRegex("^sha256:([0-9a-f]{64})$", RegexOptions.CultureInvariant)]
     private static partial Regex Digest();
+
+    [GeneratedRegex(@"^CanisMajor-[0-9A-Za-z.\-]+-win-x64\.zip$", RegexOptions.CultureInvariant)]
+    private static partial Regex PackageName();
 
     public static string Folder =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CanisMajor", "atualizacao");
@@ -39,7 +44,7 @@ public static partial class UpdateDownload
         return client;
     }
 
-    // O instalador da Release. O site também procura o arquivo que termina em Setup.exe.
+    // O pacote da Release: CanisMajor-<versão>-win-x64.zip.
     public static UpdatePackage? ParsePackage(string json, AppVersion version)
     {
         try
@@ -51,7 +56,7 @@ public static partial class UpdateDownload
             {
                 if (asset.ValueKind != JsonValueKind.Object
                     || asset.TryGetProperty("name", out var nameValue) is false || nameValue.GetString() is not { } name
-                    || !name.EndsWith("Setup.exe", StringComparison.OrdinalIgnoreCase)
+                    || !PackageName().IsMatch(name)
                     || Path.GetFileName(name) != name || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
                     continue;
 
@@ -163,16 +168,89 @@ public static partial class UpdateDownload
         return await response.Content.ReadAsStreamAsync(cancel);
     }
 
-    public static bool StartInstaller(string path)
+    // A pasta do pacote instalado (a que tem o pacote.json), a partir da pasta do editor, que fica em editor\.
+    public static string? PackageRoot(string editorFolder)
     {
+        var folder = Path.GetFullPath(editorFolder).TrimEnd(Path.DirectorySeparatorChar);
+        foreach (var candidate in new[] { folder, Path.GetDirectoryName(folder) })
+        {
+            if (candidate is not null && File.Exists(Path.Combine(candidate, PackageMarker)))
+                return candidate;
+        }
+        return null;
+    }
+
+    public static bool IsPackaged => PackageRoot(AppContext.BaseDirectory) is not null;
+
+    // Abre o pacote baixado na pasta de espera e devolve o caminho dela, ou null se o pacote não servir.
+    public static string? Unpack(string zip, string folder)
+    {
+        var staging = Path.Combine(folder, "nova-versao");
         try
         {
-            using var process = Process.Start(new ProcessStartInfo(path, InstallerArguments) { UseShellExecute = false });
-            return process is not null;
+            if (Directory.Exists(staging))
+                Directory.Delete(staging, true);
+            ZipFile.ExtractToDirectory(zip, staging);
+            var editor = Path.Combine(staging, "editor", "CanisMajor.Editor.exe");
+            return File.Exists(Path.Combine(staging, PackageMarker)) && File.Exists(editor) ? staging : null;
         }
-        catch (Exception e) when (e is Win32Exception or InvalidOperationException or IOException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
         {
-            return false;
+            return null;
+        }
+    }
+
+    // O script que espera o editor fechar, troca as pastas do pacote e abre o editor de novo.
+    // O exemplo só entra se não existir: quem mexeu nele não perde o que fez.
+    public const string ApplyScript = """
+        param([int]$ProcessId, [string]$Source, [string]$Target, [switch]$NoLaunch)
+        $log = Join-Path $PSScriptRoot 'atualizar.log'
+        try {
+            $editor = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+            if ($editor) { $editor.WaitForExit(60000) | Out-Null }
+            Start-Sleep -Milliseconds 300
+            foreach ($dir in 'editor', 'src', 'native') {
+                robocopy (Join-Path $Source $dir) (Join-Path $Target $dir) /MIR /R:20 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
+                if ($LASTEXITCODE -ge 8) { throw "robocopy $dir terminou com $LASTEXITCODE" }
+            }
+            if (-not (Test-Path (Join-Path $Target 'examples'))) {
+                robocopy (Join-Path $Source 'examples') (Join-Path $Target 'examples') /E /NFL /NDL /NJH /NJS /NP | Out-Null
+            }
+            Get-ChildItem $Source -File | ForEach-Object { Copy-Item $_.FullName $Target -Force }
+            "atualizado $(Get-Date -Format s)" | Set-Content -Encoding utf8 $log
+        } catch {
+            "falhou: $_" | Set-Content -Encoding utf8 $log
+        }
+        if (-not $NoLaunch) { Start-Process (Join-Path $Target 'editor\CanisMajor.Editor.exe') }
+        """;
+
+    // Prepara e deixa rodando a troca de arquivos. Devolve falso se este editor não é de um pacote ou se o pacote não serve.
+    public static bool StartUpdate(string zip) => StartUpdate(zip, AppContext.BaseDirectory, Environment.ProcessId, launch: true) is not null;
+
+    // Devolve o processo do script, para os testes esperarem por ele.
+    public static Process? StartUpdate(string zip, string editorFolder, int processId, bool launch)
+    {
+        if (PackageRoot(editorFolder) is not { } target)
+            return null;
+        var folder = Path.GetDirectoryName(Path.GetFullPath(zip))!;
+        if (Unpack(zip, folder) is not { } staging)
+            return null;
+        try
+        {
+            var script = Path.Combine(folder, "atualizar.ps1");
+            // Com BOM, para o PowerShell 5 ler os acentos como UTF-8.
+            File.WriteAllText(script, ApplyScript.Replace("\r\n", "\n").Replace("\n", "\r\n"), new System.Text.UTF8Encoding(true));
+            var start = new ProcessStartInfo("powershell.exe") { UseShellExecute = false, CreateNoWindow = true };
+            foreach (var arg in new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script,
+                         "-ProcessId", processId.ToString(System.Globalization.CultureInfo.InvariantCulture), "-Source", staging, "-Target", target })
+                start.ArgumentList.Add(arg);
+            if (!launch)
+                start.ArgumentList.Add("-NoLaunch");
+            return Process.Start(start);
+        }
+        catch (Exception e) when (e is Win32Exception or InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            return null;
         }
     }
 

@@ -12,7 +12,23 @@ Engine de jogos **2D** com **núcleo em Rust** e **jogos em C#**, com **shaders*
 </div>
 
 > [!NOTE]
-> Fase 2 de 3. O núcleo, a API de jogos, o exemplo e o editor funcionam. Exportação e atualização vêm na fase 3.
+> Versão 0.3. O núcleo, a API de jogos, o editor, a exportação de jogos e a atualização pelo GitHub Releases funcionam.
+
+## Instalar
+
+Baixe o `CanisMajor-<versão>-win-x64.zip` da página de [Releases](https://github.com/EduardoHolkem/canis-major/releases), descompacte numa pasta sua e abra `Canis Major.cmd`. O editor traz o .NET dentro e abre sem instalar nada. Para **fazer** jogos, instale também o [SDK do .NET 10](https://dotnet.microsoft.com/download/dotnet/10.0); o Rust não é preciso, porque o núcleo já vem pronto em `native\`.
+
+Quando sai uma versão nova, o editor avisa na cápsula. "Atualizar agora" baixa o pacote, confere o SHA-256 que o GitHub registrou, fecha, troca os arquivos e abre de novo. O seu exemplo, os seus jogos e as preferências ficam como estão.
+
+## Exportar um jogo
+
+No editor, **+ › Exportar jogo** (ou Ctrl K, "Exportar jogo"). Na linha de comando:
+
+```bash
+cm export D:\Jogos\MeuJogo
+```
+
+Sai em `export\` uma pasta com o `.exe` (o .NET vai dentro, num arquivo só), a `canis_core.dll` e os recursos, e um `.zip` dela para mandar a quem vai jogar. Quem joga não instala nada. O `.exe` abre sem janela de console; se o jogo der erro, a mensagem aparece numa caixa e fica em `erro.txt`. Com `--sem-dotnet`, o pacote fica bem menor, mas quem joga precisa do .NET 10.
 
 ## Como é feita
 
@@ -139,7 +155,7 @@ dotnet test tests\CanisMajor.Tests -c Release
 dotnet test tests\CanisMajor.Editor.Tests
 ```
 
-Os testes da engine incluem rodar o exemplo de verdade e conferir a imagem, e quebrar um shader de propósito para conferir a linha do erro. Os do editor usam a janela de verdade, sem tela: os que vieram do Sirius e os do editor de jogos (árvore de recursos, colocar e apagar na sala, desfazer, sprite, shader com erro, criar objeto e jogo novo).
+Os testes da engine incluem rodar o exemplo de verdade e conferir a imagem, e quebrar um shader de propósito para conferir a linha do erro. Os do editor usam a janela de verdade, sem tela: os que vieram do Sirius e os do editor de jogos (árvore de recursos, colocar e apagar na sala, desfazer, sprite, shader com erro, criar objeto e jogo novo, exportar um jogo com o `dotnet publish` de verdade, e o script de atualização trocando os arquivos de um pacote).
 
 ## Estrutura
 
@@ -156,14 +172,19 @@ CanisMajor/
 ├── assets/               # fontes (OFL) e ícone
 ├── ambiente.cmd          # prepara o terminal com Rust e .NET no D:
 ├── Editor.cmd            # abre o editor
+├── tools/empacotar.ps1   # monta o pacote da Release em dist\
 └── CanisMajor.slnx
 ```
 
-## Próximas fases
+## Publicar uma versão
 
-- **Fase 3, entrega:** exportar o jogo (`dotnet publish`, com opção de Native AOT, mais a `canis_core.dll`) e atualização da engine pelo GitHub Releases.
+1. Suba a `<Version>` em `src/CanisMajor/CanisMajor.csproj`, `src/CanisMajor.Editor/CanisMajor.Editor.csproj` e `src/CanisMajor.Cli/CanisMajor.Cli.csproj`.
+2. Num terminal preparado pelo `ambiente.cmd`, rode `powershell -File tools\empacotar.ps1`. Ele compila, testa e gera `dist\CanisMajor-<versão>-win-x64.zip`.
+3. Crie a Release `v<versão>` no GitHub e anexe o `.zip`. Os editores instalados acham a versão nova sozinhos.
 
 ## Limitações de hoje
+
+- Sem Native AOT: ele precisaria das ferramentas de C++ do Visual Studio, e a engine cria os objetos das salas pelo nome da classe, o que o AOT corta. O jogo exportado leva o .NET inteiro dentro (cerca de 37 MB zipado).
 
 - Só Windows, e a interface é em português do Brasil.
 - Colisão por caixa alinhada, sem rotação. Não há física.

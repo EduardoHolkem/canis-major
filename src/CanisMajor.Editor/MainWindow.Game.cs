@@ -841,6 +841,80 @@ public partial class MainWindow
         return new string(name.Trim().Where(c => !invalid.Contains(c)).ToArray()).Trim().TrimEnd('.');
     }
 
+    // Exportar
+
+    // O zip da última exportação que terminou bem. Os testes conferem por aqui.
+    public string? LastExport { get; private set; }
+
+    private void OnExportGame(object? sender, RoutedEventArgs e) => _ = ExportGameAsync();
+
+    // Roda o dotnet publish no terminal de Execução, para a pessoa ver o andamento e os erros, e no fim faz o zip.
+    public async Task ExportGameAsync()
+    {
+        if (!_isGame || RootFolder is not { } root)
+            return;
+        if (!await ConfirmStopTaskAsync())
+            return;
+        foreach (var document in _documents.Where(d => d.IsDirty).ToList())
+        {
+            if (!await SaveAsync(document))
+                return;
+        }
+
+        CanisMajor.ExportPlan plan;
+        try
+        {
+            plan = CanisMajor.GameExport.Plan(root);
+            CanisMajor.GameExport.Begin(plan);
+        }
+        catch (Exception e) when (e is CanisMajor.GameException or IOException or UnauthorizedAccessException)
+        {
+            ShowStatus(e.Message);
+            return;
+        }
+        LastExport = null;
+        StartTask(plan.CommandLine, code => FinishExport(plan, code));
+    }
+
+    private void FinishExport(CanisMajor.ExportPlan plan, int code)
+    {
+        if (code != 0)
+        {
+            ShowStatus("A exportação falhou. O terminal mostra o motivo.");
+            return;
+        }
+        try
+        {
+            LastExport = CanisMajor.GameExport.Finish(plan);
+        }
+        catch (Exception e) when (e is CanisMajor.GameException or IOException or UnauthorizedAccessException)
+        {
+            ShowStatus(e.Message);
+            return;
+        }
+        _task?.Buffer.Feed($"\x1b[32mJogo exportado: {LastExport}\x1b[0m\r\n");
+        ShowStatus($"Jogo exportado: {Path.GetFileName(LastExport)}");
+        _ = OfferExportFolderAsync(LastExport);
+    }
+
+    private async Task OfferExportFolderAsync(string zip)
+    {
+        var mb = new FileInfo(zip).Length / 1024.0 / 1024.0;
+        var choice = await AskAsync("Jogo exportado",
+            $"A pasta do jogo e o {Path.GetFileName(zip)} ({mb:0.#} MB) estão em export/. Quem for jogar abre o .exe, sem instalar nada.",
+            "Mostrar na pasta", "Fechar");
+        if (choice != DialogChoice.Primary)
+            return;
+        try
+        {
+            Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{zip}\"") { UseShellExecute = false });
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            ShowStatus("Não foi possível abrir o Explorador de Arquivos.");
+        }
+    }
+
     // Grava o que a janela mostra num PNG, para conferir a interface por foto.
     public void SaveShot(string path)
     {
@@ -861,6 +935,7 @@ public partial class MainWindow
         actions.Add(("Novo objeto", "objects/", () => _ = CreateResourceAsync("object")));
         actions.Add(("Novo sprite", "sprites/", () => _ = CreateResourceAsync("sprite")));
         actions.Add(("Novo shader", "shaders/", () => _ = CreateResourceAsync("shader")));
+        actions.Add(("Exportar jogo", "Pasta e .zip em export/", () => _ = ExportGameAsync()));
         actions.Add((IsGameView ? "Mostrar os arquivos" : "Mostrar os recursos do jogo", "Lista ao lado", () => SetGameView(!IsGameView)));
         if (IsRoomDocument)
             actions.Insert(0, (ShowsRoom ? "Ver o código da sala" : "Ver a sala desenhada", "", ToggleRoomCode));

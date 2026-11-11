@@ -152,4 +152,86 @@ public class GameRunTests
         Assert.Equal(1, p.ExitCode);
         Assert.Contains("vinheta.wgsl:3:", err);
     }
+
+    [Fact]
+    public void ExportPlanPublishesTheGameAlone()
+    {
+        using var tmp = new TempDir();
+        var root = Templates.CreateProject(tmp.Path, "Fuga da Nave", "vazio", Repo.Root);
+
+        var plan = GameExport.Plan(root);
+
+        Assert.Equal(Path.Combine(root, "FugaDaNave.csproj"), plan.Project);
+        Assert.Equal(Path.Combine(root, "export", "Fuga-da-Nave-0.1.0-win-x64"), plan.Output);
+        Assert.Equal(plan.Output + ".zip", plan.Zip);
+        Assert.Contains("-p:CanisExport=true", plan.Arguments);
+        Assert.Equal(["--self-contained", "true"], plan.Arguments.SkipWhile(a => a != "--self-contained").Take(2));
+        Assert.Equal("false", GameExport.Plan(root, selfContained: false).Arguments.SkipWhile(a => a != "--self-contained").Skip(1).First());
+        // O projeto novo já vem pronto para exportar, e preparar de novo não duplica.
+        Assert.Contains("'$(CanisExport)' == 'true'", File.ReadAllText(plan.Project));
+        Assert.False(GameExport.PrepareProject(plan.Project));
+        Assert.Contains("export/", File.ReadAllText(Path.Combine(root, ".gitignore")));
+    }
+
+    [Fact]
+    public void OldProjectGetsTheExportBlockOnce()
+    {
+        using var tmp = new TempDir();
+        Directory.CreateDirectory(tmp.Path);
+        var project = Path.Combine(tmp.Path, "Velho.csproj");
+        File.WriteAllText(project, "<Project Sdk=\"Microsoft.NET.Sdk\">\r\n  <PropertyGroup />\r\n</Project>\r\n");
+
+        Assert.True(GameExport.PrepareProject(project));
+        Assert.False(GameExport.PrepareProject(project));
+        var text = File.ReadAllText(project);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(text, "CanisExport"));
+        Assert.EndsWith("</Project>\r\n", text);
+        // As quebras de linha do arquivo continuam as mesmas: nenhuma linha só com \n.
+        Assert.DoesNotMatch("[^\r]\n", text);
+    }
+
+    [Fact]
+    public void FinishCleansAndZipsTheExport()
+    {
+        using var tmp = new TempDir();
+        var root = Templates.CreateProject(tmp.Path, "Jogo", "vazio", Repo.Root);
+        var plan = GameExport.Plan(root);
+        Directory.CreateDirectory(plan.Output);
+        foreach (var file in new[] { "Jogo.exe", "canis_core.dll", "projeto.json", "Jogo.pdb", "CanisMajor.xml" })
+            File.WriteAllText(Path.Combine(plan.Output, file), "x");
+
+        var zip = GameExport.Finish(plan);
+
+        Assert.False(File.Exists(Path.Combine(plan.Output, "Jogo.pdb")));
+        Assert.False(File.Exists(Path.Combine(plan.Output, "CanisMajor.xml")));
+        Assert.True(File.Exists(Path.Combine(plan.Output, "LEIA-ME.txt")));
+        using var archive = System.IO.Compression.ZipFile.OpenRead(zip);
+        Assert.Contains(archive.Entries, e => e.FullName.Replace('\\', '/') == "Jogo-0.1.0-win-x64/Jogo.exe");
+    }
+
+    [Fact]
+    public void FinishRefusesAnExportWithoutTheCore()
+    {
+        using var tmp = new TempDir();
+        var root = Templates.CreateProject(tmp.Path, "Jogo", "vazio", Repo.Root);
+        var plan = GameExport.Plan(root);
+        Directory.CreateDirectory(plan.Output);
+        File.WriteAllText(Path.Combine(plan.Output, "Jogo.exe"), "x");
+        File.WriteAllText(Path.Combine(plan.Output, "projeto.json"), "x");
+
+        Assert.Contains("canis_core.dll", Assert.Throws<GameException>(() => GameExport.Finish(plan)).Message);
+    }
+
+    [Fact]
+    public void ErrorTextKeepsTheGameMethodsOnly()
+    {
+        Exception error;
+        try { throw new InvalidOperationException("quebrou"); }
+        catch (Exception e) { error = e; }
+
+        var text = Runtime.UserErrorText(error);
+
+        Assert.StartsWith("Erro no jogo: InvalidOperationException: quebrou", text);
+        Assert.Contains("ErrorTextKeepsTheGameMethodsOnly", text);
+    }
 }

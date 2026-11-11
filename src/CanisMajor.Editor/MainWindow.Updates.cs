@@ -112,7 +112,7 @@ public partial class MainWindow
             return;
 
         var choice = await AskAsync($"Canis Major {version} disponível",
-            $"Você está na versão {CurrentVersion}. O Canis Major baixa a versão nova do GitHub, fecha, instala por cima e abre de novo. Suas preferências e abas continuam.",
+            $"Você está na versão {CurrentVersion}. O Canis Major baixa a versão nova do GitHub, fecha, troca os arquivos e abre de novo. Suas preferências, abas e jogos continuam.",
             "Atualizar agora", "Ver as novidades");
 
         if (choice == DialogChoice.Primary)
@@ -141,15 +141,23 @@ public partial class MainWindow
 
     private bool _updating;
 
-    // Trocados nos testes, que nunca baixam nem rodam instalador.
+    // Trocados nos testes, que nunca baixam nem trocam arquivos de verdade.
     public Func<AppVersion, IProgress<double>, CancellationToken, Task<string?>> DownloadUpdate { get; set; } = UpdateDownload.DownloadVersionAsync;
-    public Func<string, bool> RunInstaller { get; set; } = UpdateDownload.StartInstaller;
+    public Func<string, bool> RunInstaller { get; set; } = UpdateDownload.StartUpdate;
+    // Só o pacote instalado se atualiza sozinho. Rodando do repositório, a atualização é o git pull.
+    public Func<bool> CanSelfUpdate { get; set; } = () => UpdateDownload.IsPackaged;
     public bool IsUpdating => _updating;
 
     public async Task InstallUpdateAsync(AppVersion version)
     {
         if (_updating)
             return;
+        if (!CanSelfUpdate())
+        {
+            ShowStatus("Este Canis Major roda do código-fonte: atualize com git pull e compile de novo.");
+            OpenReleasePage(version);
+            return;
+        }
         _updating = true;
         UpdateButton.IsEnabled = false;
         var closing = false;
@@ -171,18 +179,18 @@ public partial class MainWindow
             if (!await ConfirmStopTaskAsync() || !await CloseAllAsync())
             {
                 _sessionFrozen = false;
-                ShowStatus("Atualização adiada. O instalador já baixado fica guardado.");
+                ShowStatus("Atualização adiada. A versão já baixada fica guardada.");
                 return;
             }
 
             if (!RunInstaller(installer))
             {
                 _sessionFrozen = false;
-                ShowStatus("Não foi possível abrir o instalador.");
+                ShowStatus("O pacote baixado não serviu para atualizar. Tente de novo ou use Ver as novidades.");
                 return;
             }
 
-            // O instalador espera o Canis Major fechar para trocar os arquivos, e depois a abre de novo.
+            // O script espera o Canis Major fechar para trocar os arquivos, e depois o abre de novo.
             closing = true;
             _allowClose = true;
             Close();

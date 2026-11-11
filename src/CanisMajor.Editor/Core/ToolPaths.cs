@@ -77,13 +77,52 @@ public static class ToolPaths
     public static void EnsureOnPath()
     {
         var current = Environment.GetEnvironmentVariable("PATH") ?? "";
-        var updated = WithDotNetRoot(WithTools(current), Environment.GetEnvironmentVariable("DOTNET_ROOT"));
+        var dotnet = FindDotNetRoot(Environment.GetEnvironmentVariable("DOTNET_ROOT"), DotNetCandidates());
+        // O jogo que o editor abre precisa achar o mesmo .NET para rodar.
+        if (dotnet is not null && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DOTNET_ROOT")))
+            Environment.SetEnvironmentVariable("DOTNET_ROOT", dotnet);
+        var updated = WithDotNetRoot(WithTools(current), dotnet);
         if (updated != current)
             Environment.SetEnvironmentVariable("PATH", updated);
     }
 
-    // Os jogos pedem o .NET 10. Quando o Canis Major abre com DOTNET_ROOT apontando para ele, como pelo atalho,
-    // esse dotnet passa na frente do que estiver no PATH, só dentro do editor e do que ele abrir.
+    private const int GameDotNetMajor = 10;
+
+    private static IEnumerable<string> DotNetCandidates()
+    {
+        yield return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "dotnet");
+        yield return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".dotnet");
+        yield return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet");
+    }
+
+    // A pasta de um dotnet com o SDK 10 ou mais novo, que compila os jogos. A do DOTNET_ROOT tem a preferência.
+    // Um computador pode ter o .NET 8 no PATH e o 10 instalado só para o usuário, como este em que o Canis Major nasceu.
+    public static string? FindDotNetRoot(string? preferred, IEnumerable<string> candidates)
+    {
+        var all = (string.IsNullOrWhiteSpace(preferred) ? candidates : candidates.Prepend(preferred)).ToList();
+        return all.FirstOrDefault(HasGameSdk)
+            ?? all.FirstOrDefault(folder => File.Exists(Path.Combine(folder, "dotnet.exe")));
+    }
+
+    private static bool HasGameSdk(string folder)
+    {
+        var sdk = Path.Combine(folder, "sdk");
+        if (!File.Exists(Path.Combine(folder, "dotnet.exe")) || !Directory.Exists(sdk))
+            return false;
+        try
+        {
+            return Directory.EnumerateDirectories(sdk)
+                .Select(Path.GetFileName)
+                .Any(name => int.TryParse(name!.Split('.')[0], out var major) && major >= GameDotNetMajor);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    // Os jogos pedem o .NET 10. O dotnet que tem ele passa na frente do que estiver no PATH,
+    // só dentro do editor e do que ele abrir.
     public static string WithDotNetRoot(string current, string? dotnetRoot)
     {
         if (string.IsNullOrWhiteSpace(dotnetRoot) || !File.Exists(Path.Combine(dotnetRoot, "dotnet.exe")))

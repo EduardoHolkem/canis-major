@@ -95,12 +95,12 @@ public static class Engine
         }
         catch (GameException e)
         {
-            Console.Error.WriteLine($"Erro: {e.Message}");
+            ErrorReport.Show($"Erro: {e.Message}");
             return 1;
         }
         catch (DllNotFoundException)
         {
-            Console.Error.WriteLine("Erro: não achei a canis_core.dll ao lado do jogo. Compile o núcleo com: cargo build --release, na pasta core.");
+            ErrorReport.Show("Erro: não achei a canis_core.dll ao lado do jogo. Compile o núcleo com: cargo build --release, na pasta core.");
             return 1;
         }
         catch (Exception e)

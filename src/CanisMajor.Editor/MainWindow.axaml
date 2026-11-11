@@ -92,6 +92,8 @@
                                         <MenuItem Header="Novo objeto" Click="OnNewObject" />
                                         <MenuItem Header="Novo sprite" Click="OnNewSprite" />
                                         <MenuItem Header="Novo shader" Click="OnNewShader" />
+                                        <Separator />
+                                        <MenuItem Header="Exportar jogo" Click="OnExportGame" />
                                     </MenuFlyout>
                                 </Button.Flyout>
                             </Button>
