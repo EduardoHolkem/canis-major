@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>CanisMajor</RootNamespace>
+    <Version>0.2.0</Version>
+    <Description>Canis Major: engine de jogos 2D com núcleo em Rust (wgpu) e jogos em C#.</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- Caminho do núcleo compilado pelo Cargo. -->
+    <CanisCoreDll>$(MSBuildThisFileDirectory)..\..\core\target\release\canis_core.dll</CanisCoreDll>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CanisMajor.Tests" />
+    <None Include="$(CanisCoreDll)" Link="canis_core.dll" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
+  <Target Name="ConferirNucleo" BeforeTargets="Build" Condition="!Exists('$(CanisCoreDll)')">
+    <Error Text="O núcleo em Rust ainda não foi compilado. Rode: cargo build --release, na pasta core." />
+  </Target>
+
+</Project>

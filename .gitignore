@@ -1,7 +1,6 @@
-.venv/
-__pycache__/
-*.pyc
-*.egg-info/
-build/
-dist/
+core/target/
+bin/
+obj/
+*.user
+.vs/
 .update/

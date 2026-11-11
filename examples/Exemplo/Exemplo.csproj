@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Exemplo</RootNamespace>
+    <AssemblyName>Exemplo</AssemblyName>
+    <!-- Pasta do Canis Major. Troque se a engine mudar de lugar. -->
+    <CanisMajorRoot Condition="'$(CanisMajorRoot)' == ''">$(MSBuildThisFileDirectory)..\..</CanisMajorRoot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(CanisMajorRoot)\src\CanisMajor\CanisMajor.csproj" />
+    <Content Include="projeto.json;sprites\**;rooms\**;shaders\**;sounds\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

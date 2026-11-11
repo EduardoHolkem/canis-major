@@ -1,0 +1,11 @@
+{
+  "name": "Exemplo",
+  "version": "0.1.0",
+  "start_room": "inicio",
+  "width": 480,
+  "height": 270,
+  "scale": 2,
+  "fps": 60,
+  "pixel_art": true,
+  "engine": "0.2.0"
+}

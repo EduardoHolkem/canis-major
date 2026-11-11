@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CanisMajor/CanisMajor.csproj" />
+    <Project Path="src/CanisMajor.Cli/CanisMajor.Cli.csproj" />
+  </Folder>
+  <Folder Name="/examples/">
+    <Project Path="examples/Exemplo/Exemplo.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CanisMajor.Tests/CanisMajor.Tests.csproj" />
+  </Folder>
+</Solution>

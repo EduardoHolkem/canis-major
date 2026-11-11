@@ -1,0 +1,25 @@
+[package]
+name = "canis_core"
+version = "0.2.0"
+edition = "2021"
+description = "Núcleo nativo do Canis Major: janela, renderização wgpu, texto, malhas 3D e som."
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wgpu = "25"
+naga = { version = "25", features = ["wgsl-in"] }
+winit = "0.30"
+pollster = "0.4"
+bytemuck = { version = "1", features = ["derive"] }
+glam = "0.30"
+fontdue = "0.9"
+image = { version = "0.25", default-features = false, features = ["png"] }
+rodio = { version = "0.20", default-features = false, features = ["wav", "vorbis"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
