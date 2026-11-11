@@ -37,6 +37,21 @@ public sealed class SpriteMeta
     public int Frames { get; set; } = 1;
     public float[] Origin { get; set; } = [0, 0];
     public float Fps { get; set; } = 8;
+    /// <summary>Máscara de colisão. Null usa o quadro inteiro.</summary>
+    public SpriteMask? Mask { get; set; }
+}
+
+/// <summary>
+/// Máscara de colisão do sprite, relativa ao canto do quadro. "rect" usa Left, Top, Right e Bottom;
+/// "auto" calcula o retângulo dos pixels visíveis de todos os quadros.
+/// </summary>
+public sealed class SpriteMask
+{
+    public string Mode { get; set; } = "rect";
+    public float Left { get; set; }
+    public float Top { get; set; }
+    public float Right { get; set; }
+    public float Bottom { get; set; }
 }
 
 /// <summary>Uma pasta de projeto: projeto.json mais sprites/, objects/, rooms/, shaders/ e sounds/.</summary>

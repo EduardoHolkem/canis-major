@@ -50,7 +50,7 @@ O editor nasceu do código da IDE [Sirius](https://github.com/erickfuzer/Sirius)
 - **Recursos do jogo na lista ao lado:** salas, objetos, sprites, shaders e sons, com o **+** para criar cada um. O botão **Arquivos** mostra a pasta como ela é.
 - **Editor de salas:** a sala desenhada com os sprites de verdade. Escolha um objeto no pincel e clique para colocar, arraste para pintar vários, arraste uma instância para mover, use o botão direito para apagar. A grade prende as posições, e o Alt solta. A roda aproxima, e o espaço com o arrasto move a vista. O botão **Código** mostra o JSON, e Ctrl Z desfaz pelos dois lados.
 - **Inspetor:** à direita, os dados da instância escolhida (objeto, X, Y e propriedades a mais, como `speed: 2`) e os da sala (tamanho, grade, fundo, shaders de tela).
-- **Sprites:** o quadro animado em tamanho grande, a tira de quadros, e a origem marcada com um clique. Quadros, velocidade e origem se mudam no Inspetor.
+- **Sprites:** editor de pixels completo, com lápis, borracha, balde, conta-gotas, quadros, animação, origem e máscara de colisão (detalhes em "O editor de sprites").
 - **Shaders conferidos enquanto você digita:** o editor usa o mesmo conferidor do jogo (naga, pela `canis_core.dll`), sublinha a linha do erro e conta os erros na cápsula.
 - **Executar (F5):** compila e abre o jogo. Um erro no jogo aparece no terminal com `arquivo.cs:linha`, e o clique leva até a linha.
 - **Novo jogo:** a partir do exemplo ou vazio, numa pasta à sua escolha.
@@ -148,6 +148,18 @@ No arquivo, as camadas ficam em `layers`, e a instância diz a camada em `layer`
 ```
 
 No código, `Game.Layer("Ceu")` devolve a camada (dá para mudar `Visible`, `Depth`, `Color` e `Parallax` durante o jogo), e `Game.SetLayerVisible("Frente", false)` esconde a camada e as instâncias dela.
+
+## O editor de sprites
+
+Abra um sprite na lista. O quadro aparece grande, com a tira de quadros embaixo, e o Inspetor traz as ferramentas:
+
+- **Desenho:** ✎ Lápis (esquerdo pinta, direito apaga), ⌫ Borracha, ◧ Balde (enche a área da mesma cor) e ◉ Conta-gotas. A cor se digita em hexadecimal (`#FF8000`, ou com alfa, `#FF800080`) ou se escolhe na paleta. Com zoom grande aparece a grade de pixels. Cada traço grava o PNG, e Ctrl Z e Ctrl Y desfazem e refazem.
+- **Quadros e animação:** ▶ Tocar ou ⏸ Parar, **+ Quadro** (vazio), **Duplicar**, ◀ ▶ para mudar a ordem e **Excluir quadro**. Clique na tira (ou use as setas) para escolher o quadro. A **casca de cebola** mostra o quadro anterior clarinho, para animar.
+- **Tamanho do quadro:** largura e altura, mantendo o canto de cima à esquerda.
+- **Origem:** a ferramenta ✛ Origem, os botões "Origem no centro" e "No canto", ou os números.
+- **Máscara de colisão:** "Quadro inteiro", "Automática" (só os pixels visíveis de todos os quadros) ou "Retângulo", desenhado com a ferramenta ▭ Máscara ou digitado. Aparece em verde, e o jogo usa a máscara em `Collide`, `Move` e `BBox`. Um componente `Collider` no objeto vale mais que a máscara do sprite.
+
+No arquivo, a máscara fica no `sprites/nome.json`, em `"mask": { "mode": "rect", "left": 4, "top": 24, "right": 12, "bottom": 32 }` ou `"mask": { "mode": "auto" }`.
 
 ## Tilesets e tiles
 

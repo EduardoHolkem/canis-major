@@ -123,10 +123,12 @@ public abstract class GameObject
         if (Get<Collider>() is { Enabled: true } c)
             return (X + dx + c.OffsetX, Y + dy + c.OffsetY, X + dx + c.OffsetX + c.Width, Y + dy + c.OffsetY + c.Height);
         if (Runtime.SpriteInfo(Sprite) is not { } s) return (X + dx, Y + dy, X + dx, Y + dy);
-        var left = X + dx - s.OriginX * ScaleX;
-        var top = Y + dy - s.OriginY * ScaleY;
-        var right = left + s.Width * ScaleX;
-        var bottom = top + s.Height * ScaleY;
+        // A máscara do sprite (do editor de sprites) recorta o quadro; sem ela, vale o quadro inteiro.
+        var (ml, mt, mr, mb) = s.Mask ?? (0, 0, s.Width, s.Height);
+        var left = X + dx + (ml - s.OriginX) * ScaleX;
+        var top = Y + dy + (mt - s.OriginY) * ScaleY;
+        var right = X + dx + (mr - s.OriginX) * ScaleX;
+        var bottom = Y + dy + (mb - s.OriginY) * ScaleY;
         return (MathF.Min(left, right), MathF.Min(top, bottom), MathF.Max(left, right), MathF.Max(top, bottom));
     }
 

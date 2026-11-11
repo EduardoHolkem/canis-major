@@ -366,6 +366,7 @@ public partial class MainWindow
         var image = LoadSprite(Path.GetFileNameWithoutExtension(png));
         var meta = GameFiles.LoadSpriteMeta(png);
         SpriteEditor.Show(image, meta.Frames, meta.Origin[0], meta.Origin[1], meta.Fps);
+        LoadSpritePixels(png, meta);
         GameMessage.Text = "Não foi possível abrir esta imagem.";
         GameMessage.IsVisible = image is null;
     }
@@ -614,6 +615,8 @@ public partial class MainWindow
         var sprite = SpriteEditor.Sprite;
         AddNote(sprite is null ? Path.GetFileName(png)
             : $"{Path.GetFileName(png)} · {sprite.PixelWidth} × {sprite.PixelHeight} px");
+        BuildSpriteTools();
+        AddHeading("Dados");
         AddNumberField("Quadros", meta.Frames, "s.frames", value => UpdateSpriteMeta(m => m.Frames = Math.Max(1, (int)value)));
         AddNumberField("Quadros por segundo", meta.Fps, "s.fps", value => UpdateSpriteMeta(m => m.Fps = (float)value));
         AddNumberField("Origem X", meta.Origin[0], "s.ox", value => UpdateSpriteMeta(m => m.Origin = [(float)value, m.Origin[1]]));
@@ -625,6 +628,7 @@ public partial class MainWindow
         actions.Children.Add(SmallButton("Editar imagem", "Abre o PNG no seu editor de imagens", () => EditImage(png)));
         Inspector.Children.Add(actions);
         AddNote("Quadros lado a lado, da esquerda para a direita, todos do mesmo tamanho. A origem é o ponto que fica em X e Y.");
+        BuildMaskFields(png, meta);
 
         if (RootFolder is not null)
         {

@@ -10,6 +10,9 @@ namespace CanisMajor;
 /// <summary>Um sprite carregado: textura e um ou mais quadros lado a lado.</summary>
 public sealed record SpriteInfo(uint Texture, float Width, float Height, int Frames, float OriginX, float OriginY, float Fps)
 {
+    /// <summary>Máscara de colisão relativa ao canto do quadro, ou null para o quadro inteiro.</summary>
+    public (float Left, float Top, float Right, float Bottom)? Mask { get; init; }
+
     public (float U0, float V0, float U1, float V1) Uv(float frame)
     {
         var i = ((int)frame % Frames + Frames) % Frames;
@@ -80,10 +83,28 @@ internal static unsafe partial class Runtime
             uint w, h;
             Native.cm_texture_size(tex, &w, &h);
             var meta = GameProject.LoadSpriteMeta(png);
-            info = new SpriteInfo(tex, (float)w / meta.Frames, h, meta.Frames, meta.Origin[0], meta.Origin[1], meta.Fps);
+            info = new SpriteInfo(tex, (float)w / meta.Frames, h, meta.Frames, meta.Origin[0], meta.Origin[1], meta.Fps) { Mask = MaskOf(png, meta) };
         }
         Sprites[name] = info;
         return info;
+    }
+
+    // A máscara de colisão do sprite: o retângulo do arquivo, ou o dos pixels visíveis no modo "auto".
+    internal static (float, float, float, float)? MaskOf(string png, SpriteMeta meta)
+    {
+        if (meta.Mask is not { } mask) return null;
+        if (!string.Equals(mask.Mode, "auto", StringComparison.OrdinalIgnoreCase))
+            return mask.Right > mask.Left && mask.Bottom > mask.Top ? (mask.Left, mask.Top, mask.Right, mask.Bottom) : null;
+        try
+        {
+            var (w, h, rgba) = Png.Load(png);
+            return Png.OpaqueBox(w, h, rgba, meta.Frames) is { } box ? (box.Left, box.Top, box.Right, box.Bottom) : null;
+        }
+        catch (Exception e) when (e is IOException or InvalidDataException or NotSupportedException)
+        {
+            Console.Error.WriteLine($"Aviso: não deu para calcular a máscara automática de {Path.GetFileName(png)} ({e.Message}). Usei o quadro inteiro.");
+            return null;
+        }
     }
 
     public static uint Shader(string? name)
