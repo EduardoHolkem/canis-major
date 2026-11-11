@@ -40,6 +40,7 @@ internal static unsafe partial class Native
     [LibraryImport(Lib)] public static partial uint cm_create_texture(byte* rgba, uint w, uint h);
     [LibraryImport(Lib)] public static partial int cm_texture_size(uint handle, uint* w, uint* h);
     [LibraryImport(Lib)] public static partial int cm_load_shader(byte* source, nuint len);
+    [LibraryImport(Lib)] public static partial int cm_check_shader(byte* source, nuint len);
     [LibraryImport(Lib)] public static partial void cm_set_shader_param(uint shader, uint index, float x, float y, float z, float w);
     [LibraryImport(Lib)] public static partial uint cm_mesh_builtin(uint kind);
     [LibraryImport(Lib)] public static partial uint cm_load_mesh(byte* path, nuint len);

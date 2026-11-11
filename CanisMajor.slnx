@@ -2,11 +2,13 @@
   <Folder Name="/src/">
     <Project Path="src/CanisMajor/CanisMajor.csproj" />
     <Project Path="src/CanisMajor.Cli/CanisMajor.Cli.csproj" />
+    <Project Path="src/CanisMajor.Editor/CanisMajor.Editor.csproj" />
   </Folder>
   <Folder Name="/examples/">
     <Project Path="examples/Exemplo/Exemplo.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/CanisMajor.Tests/CanisMajor.Tests.csproj" />
+    <Project Path="tests/CanisMajor.Editor.Tests/CanisMajor.Editor.Tests.csproj" />
   </Folder>
 </Solution>

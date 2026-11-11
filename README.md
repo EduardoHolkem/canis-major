@@ -12,7 +12,7 @@ Engine de jogos **2D** com **núcleo em Rust** e **jogos em C#**, com **shaders*
 </div>
 
 > [!NOTE]
-> Fase 1 de 3. O núcleo, a API de jogos e o exemplo funcionam. O editor, construído sobre a IDE [Sirius](https://github.com/erickfuzer/Sirius), vem na fase 2. Exportação e atualização vêm na fase 3.
+> Fase 2 de 3. O núcleo, a API de jogos, o exemplo e o editor funcionam. Exportação e atualização vêm na fase 3.
 
 ## Como é feita
 
@@ -26,6 +26,20 @@ Seu jogo (C#)  ──►  CanisMajor.dll (C#)  ──P/Invoke──►  canis_co
 - **O C# é dono do laço do jogo.** A cada quadro ele lê a entrada (`cm_poll`) e manda todo o desenho numa única chamada (`cm_frame`), num vetor de comandos. A ponte entre as linguagens custa quase nada.
 - **O Rust desenha na placa de vídeo:** sprites instanciados em lote, texto, retângulos, linhas, círculos e malhas 3D com luz e teste de profundidade. Depois aplica a cadeia de shaders de tela e encaixa a imagem na janela com letterbox. Usa Vulkan quando há, ou DirectX 12, ou OpenGL.
 - **Os erros apontam o seu código:** uma exceção mostra só as linhas dos seus scripts, no formato `arquivo.cs:linha`. Um shader com erro mostra `shaders/nome.wgsl:linha: mensagem`, conferido pelo naga antes de chegar à GPU.
+
+## O editor
+
+O editor nasceu do código da IDE [Sirius](https://github.com/erickfuzer/Sirius) e mantém tudo o que ela faz: abas, busca, terminal, Git, servidor de linguagem para C#, a cápsula do Executar. Num projeto de jogo, ele ganha:
+
+- **Recursos do jogo na lista ao lado:** salas, objetos, sprites, shaders e sons, com o **+** para criar cada um. O botão **Arquivos** mostra a pasta como ela é.
+- **Editor de salas:** a sala desenhada com os sprites de verdade. Escolha um objeto no pincel e clique para colocar, arraste para pintar vários, arraste uma instância para mover, use o botão direito para apagar. A grade prende as posições, e o Alt solta. A roda aproxima, e o espaço com o arrasto move a vista. O botão **Código** mostra o JSON, e Ctrl Z desfaz pelos dois lados.
+- **Inspetor:** à direita, os dados da instância escolhida (objeto, X, Y e propriedades a mais, como `speed: 2`) e os da sala (tamanho, grade, fundo, shaders de tela).
+- **Sprites:** o quadro animado em tamanho grande, a tira de quadros, e a origem marcada com um clique. Quadros, velocidade e origem se mudam no Inspetor.
+- **Shaders conferidos enquanto você digita:** o editor usa o mesmo conferidor do jogo (naga, pela `canis_core.dll`), sublinha a linha do erro e conta os erros na cápsula.
+- **Executar (F5):** compila e abre o jogo. Um erro no jogo aparece no terminal com `arquivo.cs:linha`, e o clique leva até a linha.
+- **Novo jogo:** a partir do exemplo ou vazio, numa pasta à sua escolha.
+
+Para abrir, rode `Editor.cmd` (compila na primeira vez).
 
 ## Um objeto do jogo
 
@@ -121,7 +135,11 @@ cargo test --release --lib --manifest-path core\Cargo.toml
 dotnet test tests\CanisMajor.Tests -c Release
 ```
 
-Os testes do C# incluem rodar o exemplo de verdade e conferir a imagem, e quebrar um shader de propósito para conferir a linha do erro.
+```bash
+dotnet test tests\CanisMajor.Editor.Tests
+```
+
+Os testes da engine incluem rodar o exemplo de verdade e conferir a imagem, e quebrar um shader de propósito para conferir a linha do erro. Os do editor usam a janela de verdade, sem tela: os que vieram do Sirius e os do editor de jogos (árvore de recursos, colocar e apagar na sala, desfazer, sprite, shader com erro, criar objeto e jogo novo).
 
 ## Estrutura
 
@@ -131,17 +149,18 @@ CanisMajor/
 │   └── src/              # lib.rs (funções exportadas), gfx.rs (wgpu), shader.rs, text.rs, mesh.rs, audio.rs, keys.rs
 ├── src/
 │   ├── CanisMajor/       # API de jogos em C#: GameObject, Game, Draw, Keys, salas, PNG e modelos
-│   └── CanisMajor.Cli/   # cm.exe: cria projetos
+│   ├── CanisMajor.Cli/   # cm.exe: cria projetos
+│   └── CanisMajor.Editor/ # o editor (Avalonia), a partir da IDE Sirius; Game/ tem a sala, o sprite e os recursos
 ├── examples/Exemplo/     # jogo de exemplo: jogador, estrelas, paredes, cubo 3D, placar e shaders
-├── tests/                # testes do C#
+├── tests/                # testes da engine e do editor
 ├── assets/               # fontes (OFL) e ícone
 ├── ambiente.cmd          # prepara o terminal com Rust e .NET no D:
+├── Editor.cmd            # abre o editor
 └── CanisMajor.slnx
 ```
 
 ## Próximas fases
 
-- **Fase 2, editor:** partir do código da IDE Sirius (C#, Avalonia, MIT) e acrescentar árvore da sala, Inspetor, editor de salas e de sprites e prévia de shaders, com o Executar compilando e rodando o jogo.
 - **Fase 3, entrega:** exportar o jogo (`dotnet publish`, com opção de Native AOT, mais a `canis_core.dll`) e atualização da engine pelo GitHub Releases.
 
 ## Limitações de hoje
@@ -149,11 +168,14 @@ CanisMajor/
 - Só Windows, e a interface é em português do Brasil.
 - Colisão por caixa alinhada, sem rotação. Não há física.
 - Abrir o jogo leva alguns segundos na primeira vez, enquanto o driver compila os pipelines.
+- O editor lê o sprite e a camada de cada objeto procurando `Sprite = "..."` e `Layer = N` no `.cs`, sem compilar. Um sprite escolhido por código, em tempo de jogo, não aparece na sala.
+- A sala do editor não desenha os objetos 3D nem o que um objeto desenha por conta própria em `OnDraw`. Esses objetos aparecem como um marcador com o nome.
+- Do Sirius vieram também ferramentas de PHP (servidor, Xdebug) que um jogo não usa. Continuam lá, sem atrapalhar.
 - O `Cargo.lock` fixa `libloading 0.8.6`, `parking_lot 0.12.3`, `parking_lot_core 0.9.10` e `winapi-util 0.1.9`. As versões mais novas exigem o `as.exe` do MinGW, que o Rust GNU não traz.
 
 ## Créditos
 
-Fontes [Geist](https://vercel.com/font) e [IBM Plex Mono](https://www.ibm.com/plex/) sob a licença SIL Open Font (textos em `assets/fonts`). Feito com [wgpu](https://wgpu.rs) e [naga](https://github.com/gfx-rs/wgpu) (MIT/Apache), [winit](https://github.com/rust-windowing/winit) (Apache), [fontdue](https://github.com/mooman219/fontdue) (MIT/Apache), [rodio](https://github.com/RustAudio/rodio) (MIT/Apache), [glam](https://github.com/bitshifter/glam-rs) (MIT/Apache) e [image](https://github.com/image-rs/image) (MIT/Apache). A interface do editor virá da IDE [Sirius](https://github.com/erickfuzer/Sirius), de Erick Fuzer, sob a licença MIT.
+Fontes [Geist](https://vercel.com/font) e [IBM Plex Mono](https://www.ibm.com/plex/) sob a licença SIL Open Font (textos em `assets/fonts`). Feito com [wgpu](https://wgpu.rs) e [naga](https://github.com/gfx-rs/wgpu) (MIT/Apache), [winit](https://github.com/rust-windowing/winit) (Apache), [fontdue](https://github.com/mooman219/fontdue) (MIT/Apache), [rodio](https://github.com/RustAudio/rodio) (MIT/Apache), [glam](https://github.com/bitshifter/glam-rs) (MIT/Apache) e [image](https://github.com/image-rs/image) (MIT/Apache). O editor é feito a partir da IDE [Sirius](https://github.com/erickfuzer/Sirius), de Erick Fuzer, sob a licença MIT (texto em `src/CanisMajor.Editor/LICENSE-Sirius.txt`), com [Avalonia](https://avaloniaui.net), [AvaloniaEdit](https://github.com/AvaloniaUI/AvaloniaEdit) e [TextMateSharp](https://github.com/danipen/TextMateSharp) (MIT), e os ícones do [Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme) (MIT).
 
 ## Licença
 

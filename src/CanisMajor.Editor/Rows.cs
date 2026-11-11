@@ -1,0 +1,42 @@
+using Avalonia;
+using Avalonia.Media;
+
+namespace CanisEditor;
+
+// Linhas exibidas nas listas da janela. A lista é recriada quando algo muda.
+public sealed record TreeRow(
+    string Name, string FullPath, bool IsFolder, Thickness Padding, Geometry? Chevron,
+    FontWeight Weight, IBrush Background, IBrush Foreground, bool IsDirty, string GitLetter, IBrush GitBrush, IImage? Icon);
+
+public sealed record TabRow(string Name, string FullPath, FontWeight Weight, IBrush Foreground, bool IsDirty, IImage Icon);
+
+public sealed record CommandRow(string Name, string Hint, IBrush Background, Action Run, IImage? Icon = null);
+
+public sealed record RecentRow(string Name, string Folder, string FullPath);
+
+public sealed record GitRow(string Name, string Folder, string Letter, IBrush Brush, bool IsIncluded, CanisEditor.Core.GitChange Change, IImage Icon);
+
+// O histórico mistura quatro tipos de linha: commit, arquivo dele, aviso e "carregar mais".
+public sealed record HistoryCommitRow(CanisEditor.Core.GitCommit Commit, string Detail, string Tip, Geometry Chevron);
+
+public sealed record HistoryFileRow(
+    CanisEditor.Core.GitCommit Commit, CanisEditor.Core.GitChange Change, string Name, string Folder, string Letter, IBrush Brush, IBrush Background, IImage Icon);
+
+public sealed record HistoryNoteRow(string Text);
+
+public sealed record HistoryMoreRow(string Text);
+
+public sealed record FrameRow(string Name, string Location, string Tip, IBrush Background, int Index);
+
+// IsWatch: uma expressão vigiada, que tem o x para sair da lista.
+public sealed record VariableRow(string Name, string Value, string Type, Thickness Indent, Geometry? Chevron, IBrush Background, CanisEditor.Core.DebugVariable Variable, bool IsWatch = false);
+
+public sealed record ProblemRow(string Message, string Location, IBrush Brush, string FullPath, int Line, int Character);
+
+// Na busca, cada arquivo é uma linha de título seguida das linhas com resultado.
+public sealed record SearchRow(
+    bool IsFile, string Title, string Hint, string FullPath, int Line, int Column, int Length,
+    string Before, string Match, string After, IBrush Background, IImage? Icon = null)
+{
+    public bool IsHit => !IsFile;
+}

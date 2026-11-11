@@ -1,0 +1,1020 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ae="using:AvaloniaEdit"
+        xmlns:s="using:CanisEditor"
+        xmlns:t="using:CanisEditor.Terminal"
+        xmlns:e="using:CanisEditor.Editing"
+        xmlns:g="using:CanisEditor.Game"
+        x:Class="CanisEditor.MainWindow"
+        x:DataType="s:MainWindow"
+        x:CompileBindings="False"
+        Title="Canis Major"
+        Icon="avares://CanisMajor.Editor/Assets/canis.ico"
+        Width="1320" Height="860" MinWidth="720" MinHeight="480"
+        WindowStartupLocation="CenterScreen"
+        WindowDecorations="BorderOnly"
+        ExtendClientAreaToDecorationsHint="True"
+        Background="{DynamicResource Ground}"
+        Foreground="{DynamicResource Ink}"
+        FontFamily="{DynamicResource UiFont}"
+        FontSize="13">
+
+    <Panel Margin="{Binding $parent[Window].OffScreenMargin}">
+        <Grid RowDefinitions="40,*">
+
+            <!-- Barra de título -->
+            <Grid x:Name="TitleBar" Grid.Row="0" Background="Transparent" ColumnDefinitions="*,Auto,*"
+                  PointerPressed="OnTitleBarPressed">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" Margin="14,0,0,0" VerticalAlignment="Center">
+                    <Path Width="15" Height="15" Fill="{DynamicResource Accent}" Stretch="Uniform" VerticalAlignment="Center"
+                          Data="M7 0C7.6 4 9.2 6.4 14 7C9.2 7.6 7.6 10 7 14C6.4 10 4.8 7.6 0 7C4.800 6.4 6.4 4 7 0ZM17.5 15A1.5 1.5 0 1 1 14.5 15A1.5 1.5 0 1 1 17.500 15Z" />
+                    <TextBlock Text="Canis Major" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <Button x:Name="ProjectButton" Classes="flat" Height="24" Padding="6,0" Margin="-6,0,0,0" CornerRadius="6" IsVisible="False"
+                            Click="OnProjectNameClick" AutomationProperties.Name="Pastas recentes" ToolTip.Tip="Pastas recentes">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <TextBlock x:Name="ProjectName" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" />
+                            <Path Stroke="{DynamicResource Muted}" StrokeThickness="1.2" VerticalAlignment="Center" Data="M0 0L3.5 3.5L7 0" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <Button Grid.Column="1" Classes="flat" Width="400" Height="28" CornerRadius="14"
+                        Background="{DynamicResource Tint}" Click="OnOpenPalette"
+                        AutomationProperties.Name="Ir para arquivo ou comando">
+                    <Grid ColumnDefinitions="Auto,*,Auto" Margin="11,0,4,0">
+                        <Viewbox Grid.Column="0" Width="12" Height="12" VerticalAlignment="Center">
+                            <Path Stroke="{DynamicResource Muted}" StrokeThickness="1.5"
+                                  Data="M12 7A5 5 0 1 1 2 7A5 5 0 1 1 12 7M11 11L14.5 14.5" />
+                        </Viewbox>
+                        <TextBlock Grid.Column="1" Text="Ir para arquivo ou comando" FontSize="12" Foreground="{DynamicResource Muted}"
+                                   Margin="8,0" VerticalAlignment="Center" />
+                        <Border Grid.Column="2" Background="{DynamicResource Sheet}" CornerRadius="10" Padding="8,2" VerticalAlignment="Center">
+                            <TextBlock Text="Ctrl K" FontSize="11" FontWeight="Medium" Foreground="{DynamicResource Muted}" />
+                        </Border>
+                    </Grid>
+                </Button>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0">
+                    <Button x:Name="SettingsButton" Classes="flat chrome" Click="OnOpenSettings" AutomationProperties.Name="Configurações" ToolTip.Tip="Configurações (Ctrl ,)">
+                        <Path Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.2" Data="M0 2.5H13M0 9.5H13M4 0V5M9 7V12" />
+                    </Button>
+                    <Button Classes="flat chrome" Click="OnMinimize" AutomationProperties.Name="Minimizar janela">
+                        <Path Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.1" Data="M0 0H10" />
+                    </Button>
+                    <Button Classes="flat chrome" Click="OnMaximize" AutomationProperties.Name="Maximizar janela">
+                        <Path Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.1" Data="M1.5 0H7.5A1.5 1.5 0 0 1 9 1.5V7.5A1.5 1.5 0 0 1 7.5 9H1.5A1.5 1.5 0 0 1 0 7.5V1.5A1.5 1.5 0 0 1 1.5 0Z" />
+                    </Button>
+                    <Button Classes="flat chrome" Click="OnCloseWindow" AutomationProperties.Name="Fechar janela">
+                        <Path Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.1" Data="M0 0L8 8M8 0L0 8" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*" Margin="8,0,8,8">
+
+                <Panel x:Name="Sidebar" Grid.Column="0" Width="232">
+                    <!-- Árvore de arquivos -->
+                    <Grid x:Name="TreeView" RowDefinitions="Auto,*">
+                        <Grid x:Name="TreeHeader" Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto,Auto" Height="28" Margin="6,0,0,0">
+                            <TextBlock x:Name="TreeTitle" Grid.Column="0" Text="Arquivos" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" />
+                            <!-- Num projeto de jogo: os recursos (salas, objetos, sprites...) ou a pasta como ela é. -->
+                            <StackPanel x:Name="TreeModeSwitch" Grid.Column="0" Orientation="Horizontal" Spacing="2" Margin="-6,0,0,0" VerticalAlignment="Center" IsVisible="False">
+                                <Button x:Name="GameViewButton" Classes="flat segment" Height="22" Padding="8,0" FontSize="12" Content="Jogo" Click="OnShowGameView"
+                                        ToolTip.Tip="Salas, objetos, sprites, shaders e sons" />
+                                <Button x:Name="FilesViewButton" Classes="flat segment" Height="22" Padding="8,0" FontSize="12" Content="Arquivos" Click="OnShowFilesView"
+                                        ToolTip.Tip="A pasta do projeto como ela é" />
+                            </StackPanel>
+                            <Button x:Name="NewResourceButton" Grid.Column="1" Classes="flat tool" IsVisible="False" ToolTip.Tip="Novo recurso" AutomationProperties.Name="Novo recurso">
+                                <Path Stroke="{DynamicResource Muted}" StrokeThickness="1.3" Data="M5 0V10M0 5H10" />
+                                <Button.Flyout>
+                                    <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                        <MenuItem Header="Nova sala" Click="OnNewRoom" />
+                                        <MenuItem Header="Novo objeto" Click="OnNewObject" />
+                                        <MenuItem Header="Novo sprite" Click="OnNewSprite" />
+                                        <MenuItem Header="Novo shader" Click="OnNewShader" />
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                            </Button>
+                            <Button Grid.Column="4" Classes="flat" Height="24" Padding="5,0" CornerRadius="6" Click="OnOpenGit" ToolTip.Tip="Git (Ctrl Shift G)" AutomationProperties.Name="Abrir Git">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <Viewbox Width="12" Height="12" VerticalAlignment="Center">
+                                        <Path Stroke="{DynamicResource Muted}" StrokeThickness="1.4"
+                                              Data="M5.8 3.5A1.8 1.8 0 1 1 2.2 3.5A1.8 1.8 0 1 1 5.8 3.5M5.8 12.5A1.8 1.8 0 1 1 2.2 12.5A1.8 1.8 0 1 1 5.8 12.5M13.8 5A1.8 1.8 0 1 1 10.2 5A1.8 1.8 0 1 1 13.8 5M4 5.3V10.7M12 6.8C12 9.8 4 8.3 4 10.8" />
+                                    </Viewbox>
+                                    <TextBlock x:Name="GitCount" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Accent}" VerticalAlignment="Center" IsVisible="False" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="NewFileButton" Grid.Column="2" Classes="flat tool" Click="OnNewFile" ToolTip.Tip="Novo arquivo" AutomationProperties.Name="Novo arquivo">
+                                <Path Stroke="{DynamicResource Muted}" StrokeThickness="1.2"
+                                      Data="M0 0H5.5L8.5 3V11H0ZM5.5 0V3H8.5M2.5 7H6M4.25 5.25V8.75" />
+                            </Button>
+                            <Button x:Name="NewFolderButton" Grid.Column="3" Classes="flat tool" Click="OnNewFolder" ToolTip.Tip="Nova pasta" AutomationProperties.Name="Nova pasta">
+                                <Path Stroke="{DynamicResource Muted}" StrokeThickness="1.2"
+                                      Data="M0 0H4L5.5 1.5H11V8.5H0ZM3.75 5H7.25M5.5 3.25V6.75" />
+                            </Button>
+                        </Grid>
+                        <!-- Virtualizada: só as linhas à vista existem. Uma pasta como node_modules aberta desenhava milhares e travava a janela. -->
+                        <ItemsControl x:Name="TreeList" Grid.Row="1">
+                            <ItemsControl.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Novo arquivo" Click="OnNewFileAtRoot" />
+                                    <MenuItem Header="Nova pasta" Click="OnNewFolderAtRoot" />
+                                </ContextMenu>
+                            </ItemsControl.ContextMenu>
+                            <ItemsControl.Template>
+                                <ControlTemplate TargetType="ItemsControl">
+                                    <ScrollViewer x:Name="TreeScroll" Background="Transparent" HorizontalScrollBarVisibility="Disabled">
+                                        <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" Margin="0,0,0,12" />
+                                    </ScrollViewer>
+                                </ControlTemplate>
+                            </ItemsControl.Template>
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <VirtualizingStackPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="s:TreeRow">
+                                    <Button Classes="flat" Height="26" HorizontalAlignment="Stretch" Background="{Binding Background}"
+                                            Foreground="{Binding Foreground}" Click="OnTreeRowClick">
+                                        <Button.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Novo arquivo" Click="OnTreeNewFile" />
+                                                <MenuItem Header="Nova pasta" Click="OnTreeNewFolder" />
+                                                <Separator />
+                                                <MenuItem Header="Renomear" InputGesture="F2" Click="OnTreeRename" />
+                                                <MenuItem Header="Excluir" Click="OnTreeDelete" />
+                                            </ContextMenu>
+                                        </Button.ContextMenu>
+                                        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" Margin="{Binding Padding}">
+                                            <Path Grid.Column="0" Width="12" Margin="0,0,3,0" VerticalAlignment="Center"
+                                                  Stroke="{DynamicResource Muted}" StrokeThickness="1.2" Data="{Binding Chevron}" />
+                                            <Image Grid.Column="1" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"
+                                                   Source="{Binding Icon}" IsVisible="{Binding Icon, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                            <TextBlock Grid.Column="2" Text="{Binding Name}" FontWeight="{Binding Weight}"
+                                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                            <Ellipse Grid.Column="3" Width="6" Height="6" Margin="6,0,4,0" Fill="{DynamicResource Accent}"
+                                                     IsVisible="{Binding IsDirty}" />
+                                            <TextBlock Grid.Column="4" Text="{Binding GitLetter}" Foreground="{Binding GitBrush}" Margin="4,0,8,0" MinWidth="8"
+                                                       FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+
+                    <!-- Busca no projeto -->
+                    <Grid x:Name="SearchView" IsVisible="False" RowDefinitions="Auto,Auto,Auto,Auto,*" Margin="0,2,0,0">
+                        <Border Grid.Row="0" Height="30" CornerRadius="15" Background="{DynamicResource Tint}">
+                            <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="12,0,4,0">
+                                <TextBox x:Name="SearchInput" Grid.Column="0" Classes="bare" PlaceholderText="Buscar no projeto" FontSize="13"
+                                         Foreground="{DynamicResource Ink}" AutomationProperties.Name="Buscar no projeto" />
+                                <Button x:Name="MatchCaseButton" Grid.Column="1" Classes="flat option" Content="Aa" Click="OnToggleMatchCase"
+                                        AutomationProperties.Name="Diferenciar maiúsculas" ToolTip.Tip="Diferenciar maiúsculas" />
+                                <Button x:Name="RegexButton" Grid.Column="2" Classes="flat option" Content=".*" Click="OnToggleRegex"
+                                        AutomationProperties.Name="Usar expressão regular" ToolTip.Tip="Usar expressão regular" />
+                                <Button Grid.Column="3" Classes="flat option" Click="OnCloseSearch" AutomationProperties.Name="Fechar busca" ToolTip.Tip="Fechar busca">
+                                    <Path Stroke="{DynamicResource Muted}" StrokeThickness="1.1" Data="M0 0L8 8M8 0L0 8" />
+                                </Button>
+                            </Grid>
+                        </Border>
+                        <Border x:Name="ReplaceBar" Grid.Row="1" Height="30" Margin="0,4,0,0" CornerRadius="15" Background="{DynamicResource Tint}">
+                            <Grid ColumnDefinitions="*,Auto" Margin="12,0,4,0">
+                                <TextBox x:Name="ReplaceInput" Grid.Column="0" Classes="bare" PlaceholderText="Substituir por" FontSize="13"
+                                         Foreground="{DynamicResource Ink}" AutomationProperties.Name="Substituir por" />
+                                <Button Grid.Column="1" Classes="flat" Height="22" CornerRadius="11" Padding="9,0" FontSize="11" FontWeight="Medium"
+                                        Foreground="{DynamicResource Muted}" Content="Substituir tudo" Click="OnReplaceClick" />
+                            </Grid>
+                        </Border>
+                        <TextBlock x:Name="SearchStatus" Grid.Row="2" Margin="8,8,8,4" FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                        <TextBlock x:Name="UsesHint" Grid.Row="3" Margin="8,0,8,6" FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" IsVisible="False"
+                                   Text="Para trocar o nome em todos, use Renomear símbolo, no botão direito do editor." />
+                        <ItemsControl x:Name="SearchList" Grid.Row="4">
+                            <ItemsControl.Template>
+                                <ControlTemplate TargetType="ItemsControl">
+                                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                                        <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" />
+                                    </ScrollViewer>
+                                </ControlTemplate>
+                            </ItemsControl.Template>
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <VirtualizingStackPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="s:SearchRow">
+                                    <Button Classes="flat" Height="24" CornerRadius="6" HorizontalAlignment="Stretch"
+                                            Background="{Binding Background}" Click="OnSearchRowClick">
+                                        <Panel Margin="8,0">
+                                            <Grid ColumnDefinitions="Auto,Auto,*" IsVisible="{Binding IsFile}">
+                                                <Image Grid.Column="0" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center" Source="{Binding Icon}" IsVisible="{Binding Icon, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Title}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="2" Text="{Binding Hint}" Margin="6,0,0,0" FontSize="11" Foreground="{DynamicResource Muted}"
+                                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                            </Grid>
+                                            <Grid ColumnDefinitions="32,*" IsVisible="{Binding IsHit}">
+                                                <TextBlock Grid.Column="0" Text="{Binding Line}" FontFamily="{DynamicResource CodeFont}" FontSize="11"
+                                                           Foreground="{DynamicResource Faint}" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="1" FontFamily="{DynamicResource CodeFont}" FontSize="12" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"><Run Text="{Binding Before}" Foreground="{DynamicResource Muted}" /><Run Text="{Binding Match}" Foreground="{DynamicResource Accent}" FontWeight="SemiBold" /><Run Text="{Binding After}" Foreground="{DynamicResource Muted}" /></TextBlock>
+                                            </Grid>
+                                        </Panel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+
+                    <!-- Git -->
+                    <Panel x:Name="GitView" IsVisible="False" Margin="0,2,0,0">
+                        <StackPanel x:Name="GitEmptyPanel" Spacing="10" Margin="8,16" IsVisible="False">
+                            <TextBlock x:Name="GitEmptyTitle" Text="Esta pasta não usa Git" FontWeight="SemiBold" />
+                            <TextBlock x:Name="GitEmptyMessage" Text="O Git guarda o histórico do projeto e permite publicar no GitHub." Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                            <Button x:Name="GitInitButton" Classes="primary" Content="Iniciar repositório" Click="OnGitInitClick" />
+                            <Button x:Name="GitInstallButton" Classes="primary" Content="Instalar o Git" IsVisible="False" Click="OnGitInstallClick" />
+                            <Button Classes="secondary" Content="Voltar aos arquivos" Click="OnCloseGit" />
+                        </StackPanel>
+
+                        <Grid x:Name="GitRepoPanel" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*">
+                            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto,Auto" Height="28" Margin="4,0,0,0">
+                                <Button x:Name="GitBranchButton" Grid.Column="0" Classes="flat" Height="24" Padding="6,0" MaxWidth="140" FontWeight="SemiBold" FontSize="12"
+                                        Click="OnBranchClick" ToolTip.Tip="Trocar de branch" />
+                                <Button x:Name="GitPullButton" Grid.Column="2" Classes="flat" Height="24" Padding="7,0" FontSize="11" Foreground="{DynamicResource Muted}"
+                                        Content="Receber" Click="OnPullClick" ToolTip.Tip="Receber as novidades do repositório remoto" />
+                                <Button x:Name="GitPushButton" Grid.Column="3" Classes="flat" Height="24" Padding="7,0" FontSize="11" Foreground="{DynamicResource Muted}"
+                                        Content="Enviar" Click="OnPushClick" ToolTip.Tip="Enviar seus commits para o repositório remoto" />
+                                <Button Grid.Column="4" Classes="flat option" Click="OnCloseGit" AutomationProperties.Name="Fechar Git" ToolTip.Tip="Voltar aos arquivos">
+                                    <Path Stroke="{DynamicResource Muted}" StrokeThickness="1.1" Data="M0 0L8 8M8 0L0 8" />
+                                </Button>
+                            </Grid>
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="2" Margin="4,4,4,0">
+                                <Button x:Name="GitChangesTab" Classes="flat segment on" Height="24" Padding="9,0" FontSize="12" Content="Mudanças" Click="OnGitChangesTab" />
+                                <Button x:Name="GitHistoryTab" Classes="flat segment" Height="24" Padding="9,0" FontSize="12" Content="Histórico" Click="OnGitHistoryTab" />
+                            </StackPanel>
+                            <Border x:Name="GitMessageBox" Grid.Row="2" MinHeight="54" Margin="0,6,0,0" Padding="10,6" CornerRadius="10" Background="{DynamicResource Tint}">
+                                <TextBox x:Name="GitMessage" Classes="bare" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="120" FontSize="13"
+                                         VerticalContentAlignment="Top" PlaceholderText="O que mudou? (Ctrl Enter faz o commit)" Foreground="{DynamicResource Ink}"
+                                         AutomationProperties.Name="Mensagem do commit" />
+                            </Border>
+                            <Button x:Name="GitCommitButton" Grid.Row="3" Classes="primary" Margin="0,6,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Fazer commit" Click="OnCommitClick" />
+                            <TextBlock x:Name="GitStatusLine" Grid.Row="4" Margin="8,6,8,2" FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="GitHistoryEmpty" Grid.Row="5" IsVisible="False" Margin="8,4" FontSize="12" Foreground="{DynamicResource Muted}" Text="Nenhum commit ainda." />
+                            <StackPanel x:Name="GitNotices" Grid.Row="5">
+                                <TextBlock x:Name="GitConflictNotice" IsVisible="False" Margin="8,2,8,6" FontSize="12" Foreground="{DynamicResource Error}" TextWrapping="Wrap"
+                                           Text="Há conflitos. Clique em cada arquivo com ! e escolha o que fica. Depois, faça o commit." />
+                                <TextBlock x:Name="GitNothing" IsVisible="False" Margin="8,4" FontSize="12" Foreground="{DynamicResource Muted}" Text="Nenhuma mudança desde o último commit." />
+                            </StackPanel>
+                            <ItemsControl x:Name="GitHistoryList" Grid.Row="6" Margin="0,2,0,0" IsVisible="False">
+                                <ItemsControl.Template>
+                                    <ControlTemplate TargetType="ItemsControl">
+                                        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                                            <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" />
+                                        </ScrollViewer>
+                                    </ControlTemplate>
+                                </ItemsControl.Template>
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <VirtualizingStackPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.DataTemplates>
+                                    <DataTemplate x:DataType="s:HistoryCommitRow">
+                                        <Button Classes="flat" Height="42" CornerRadius="6" HorizontalAlignment="Stretch" Click="OnHistoryCommitClick" ToolTip.Tip="{Binding Tip}">
+                                            <Button.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Copiar código do commit" Click="OnHistoryCopyOid" />
+                                                </ContextMenu>
+                                            </Button.ContextMenu>
+                                            <Grid ColumnDefinitions="Auto,*" Margin="4,0,8,0">
+                                                <Path Grid.Column="0" Width="12" Margin="0,0,5,0" VerticalAlignment="Center"
+                                                      Stroke="{DynamicResource Muted}" StrokeThickness="1.2" Data="{Binding Chevron}" />
+                                                <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Commit.Subject}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Detail}" FontSize="11" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Button>
+                                    </DataTemplate>
+                                    <DataTemplate x:DataType="s:HistoryFileRow">
+                                        <Button Classes="flat" Height="26" CornerRadius="6" HorizontalAlignment="Stretch" Background="{Binding Background}" Click="OnHistoryFileClick"
+                                                ToolTip.Tip="Comparar com a versão anterior">
+                                            <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="21,0,8,0">
+                                                <Image Grid.Column="0" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center" Source="{Binding Icon}" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Name}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="2" Text="{Binding Folder}" FontSize="11" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="3" Text="{Binding Letter}" Foreground="{Binding Brush}" Margin="6,0,0,0" MinWidth="8" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Button>
+                                    </DataTemplate>
+                                    <DataTemplate x:DataType="s:HistoryNoteRow">
+                                        <TextBlock Text="{Binding Text}" Margin="21,4,8,6" FontSize="11" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                                    </DataTemplate>
+                                    <DataTemplate x:DataType="s:HistoryMoreRow">
+                                        <Button Classes="flat" Height="28" CornerRadius="6" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,2,0,12"
+                                                FontSize="12" Foreground="{DynamicResource Muted}" Content="{Binding Text}" Click="OnHistoryMoreClick" />
+                                    </DataTemplate>
+                                </ItemsControl.DataTemplates>
+                            </ItemsControl>
+                            <ItemsControl x:Name="GitList" Grid.Row="6" Margin="0,2,0,0">
+                                <ItemsControl.Template>
+                                    <ControlTemplate TargetType="ItemsControl">
+                                        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                                            <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" />
+                                        </ScrollViewer>
+                                    </ControlTemplate>
+                                </ItemsControl.Template>
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <VirtualizingStackPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="s:GitRow">
+                                        <Button Classes="flat" Height="26" CornerRadius="6" HorizontalAlignment="Stretch" Click="OnGitRowClick" ToolTip.Tip="Comparar com o último commit">
+                                            <Button.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Comparar" Click="OnGitRowClick" />
+                                                    <MenuItem Header="Abrir arquivo" Click="OnGitRowOpen" />
+                                                    <Separator />
+                                                    <MenuItem Header="Descartar mudanças" Click="OnGitRowDiscard" />
+                                                </ContextMenu>
+                                            </Button.ContextMenu>
+                                            <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto" Margin="4,0,4,0">
+                                                <Button Grid.Column="0" Classes="flat" Width="20" Height="20" CornerRadius="5" HorizontalContentAlignment="Center" Click="OnGitRowToggle"
+                                                        AutomationProperties.Name="Incluir no commit" ToolTip.Tip="Incluir no commit">
+                                                    <Border Width="13" Height="13" CornerRadius="3" BorderThickness="1" BorderBrush="{DynamicResource Muted}">
+                                                        <Path Stroke="{DynamicResource Accent}" StrokeThickness="1.6" Stretch="Uniform" Margin="1" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsIncluded}" Data="M2 6.5L5 9.5L11 3" />
+                                                    </Border>
+                                                </Button>
+                                                <Image Grid.Column="1" Width="16" Height="16" Margin="5,0,6,0" VerticalAlignment="Center" Source="{Binding Icon}" />
+                                                <TextBlock Grid.Column="2" Text="{Binding Name}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="3" Text="{Binding Folder}" FontSize="11" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                <Button Grid.Column="4" Classes="flat" Width="20" Height="20" CornerRadius="5" HorizontalContentAlignment="Center" Click="OnGitRowDiscard"
+                                                        AutomationProperties.Name="Descartar mudanças" ToolTip.Tip="Descartar mudanças">
+                                                    <Path Stroke="{DynamicResource Muted}" StrokeThickness="1.2" Data="M0 2.5H6A3 3 0 0 1 6 8.5H2M2.5 0L0 2.5L2.5 5" />
+                                                </Button>
+                                                <TextBlock Grid.Column="5" Text="{Binding Letter}" Foreground="{Binding Brush}" Margin="4,0,2,0" MinWidth="8" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Grid>
+                    </Panel>
+                </Panel>
+
+                <Thumb x:Name="SidebarSplitter" Grid.Column="1" Classes="splitter" DragDelta="OnSidebarDrag" DragCompleted="OnSidebarDragDone"
+                       AutomationProperties.Name="Redimensionar barra lateral" />
+
+                <!-- Folha do editor -->
+                <Border x:Name="SheetBorder" Grid.Column="2" Background="{DynamicResource Sheet}" CornerRadius="12" ClipToBounds="True">
+                    <Grid RowDefinitions="Auto,*">
+                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto,Auto" MinHeight="34" Margin="6,2,14,0">
+                            <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                                <ItemsControl x:Name="TabList">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" Spacing="2" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="s:TabRow">
+                                            <Button Classes="flat" Height="28" Foreground="{Binding Foreground}" Click="OnTabClick"
+                                                    PointerPressed="OnTabPointerPressed">
+                                                <StackPanel Orientation="Horizontal" Spacing="6" Margin="10,0,4,0">
+                                                    <Image Width="16" Height="16" VerticalAlignment="Center" Source="{Binding Icon}" />
+                                                    <TextBlock Text="{Binding Name}" FontWeight="{Binding Weight}" VerticalAlignment="Center" />
+                                                    <Ellipse Width="6" Height="6" Fill="{DynamicResource Accent}" IsVisible="{Binding IsDirty}" />
+                                                    <Button Classes="flat" Width="18" Height="18" Click="OnTabClose" CornerRadius="9"
+                                                            HorizontalContentAlignment="Center" AutomationProperties.Name="Fechar aba">
+                                                        <Path Stroke="{DynamicResource Muted}" StrokeThickness="1.1" Data="M0 0L8 8M8 0L0 8" />
+                                                    </Button>
+                                                </StackPanel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                            <TextBlock x:Name="Breadcrumb" Grid.Column="1" Margin="12,0,0,0" MaxWidth="320" TextTrimming="CharacterEllipsis" FontSize="12" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" />
+                            <Button x:Name="SvgToggle" Grid.Column="2" Classes="flat segment" Height="24" Padding="9,0" Margin="10,0,0,0" FontSize="12"
+                                    Content="Prévia" IsVisible="False" Click="OnSvgToggle" ToolTip.Tip="Mostrar ou esconder o desenho do SVG" />
+                            <!-- Num GIF ou WebP animado: parar num quadro para olhar com calma. -->
+                            <Button x:Name="AnimationToggle" Grid.Column="3" Classes="flat segment" Height="24" Padding="9,0" Margin="10,0,0,0" FontSize="12"
+                                    Content="Pausar" IsVisible="False" Click="OnAnimationToggle" ToolTip.Tip="Pausar ou continuar a animação" />
+                            <!-- Numa sala do jogo: o editor visual ou o JSON. -->
+                            <Button x:Name="RoomCodeToggle" Grid.Column="4" Classes="flat segment" Height="24" Padding="9,0" Margin="10,0,0,0" FontSize="12"
+                                    Content="Código" IsVisible="False" Click="OnRoomCodeToggle" ToolTip.Tip="Alternar entre a sala desenhada e o texto dela" />
+                        </Grid>
+
+                        <Panel x:Name="SheetHost" Grid.Row="1">
+                            <!-- Num .svg, o desenho aparece à direita do código e acompanha a digitação. -->
+                            <Grid x:Name="EditorGrid" ColumnDefinitions="*,Auto,0">
+                                <ae:TextEditor x:Name="CodeEditor" Grid.Column="0" IsVisible="False" Background="Transparent" BorderThickness="0"
+                                               Foreground="{DynamicResource Ink}" FontFamily="{DynamicResource CodeFont}" FontSize="13.5"
+                                               Padding="0,8,0,0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" />
+                                <Border x:Name="SvgDivider" Grid.Column="1" Width="1" Background="{DynamicResource Tint}" IsVisible="False" />
+                                <Panel x:Name="SvgPane" Grid.Column="2" IsVisible="False">
+                                    <e:ImagePreview x:Name="SvgView" ClipToBounds="True" AutomationProperties.Name="Prévia do SVG" />
+                                    <TextBlock x:Name="SvgMessage" Margin="24,0" IsVisible="False" Foreground="{DynamicResource Muted}" FontSize="12" TextWrapping="Wrap"
+                                               TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="SvgNote" Margin="14,10,14,0" IsVisible="False" Foreground="{DynamicResource Muted}" FontSize="11" TextWrapping="Wrap"
+                                               VerticalAlignment="Top" Text="Este trecho ainda não forma um desenho. A prévia mostra a última versão que funcionou." />
+                                </Panel>
+                            </Grid>
+
+                            <!-- Clique na faixa colorida da margem: como o trecho era no último commit. -->
+                            <Border x:Name="ChangePeek" IsVisible="False" HorizontalAlignment="Stretch" VerticalAlignment="Top"
+                                    CornerRadius="10" ClipToBounds="True" Background="{DynamicResource Pop}" BorderBrush="{DynamicResource Tint}" BorderThickness="1">
+                                <Grid RowDefinitions="Auto,Auto">
+                                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto" Height="32" Margin="12,0,6,0">
+                                        <TextBlock x:Name="ChangePeekTitle" Grid.Column="0" FontSize="12" Foreground="{DynamicResource Muted}"
+                                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                        <StackPanel x:Name="ChangePeekNavigation" Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" Margin="0,0,6,0">
+                                            <Button Classes="flat option" Click="OnChangePeekPrevious" AutomationProperties.Name="Trecho alterado anterior" ToolTip.Tip="Trecho alterado anterior">
+                                                <Path Stroke="{DynamicResource Muted}" StrokeThickness="1.3" Data="M0 4L4 0L8 4" />
+                                            </Button>
+                                            <Button Classes="flat option" Click="OnChangePeekNext" AutomationProperties.Name="Próximo trecho alterado" ToolTip.Tip="Próximo trecho alterado">
+                                                <Path Stroke="{DynamicResource Muted}" StrokeThickness="1.3" Data="M0 0L4 4L8 0" />
+                                            </Button>
+                                        </StackPanel>
+                                        <Button x:Name="ChangePeekRevert" Grid.Column="2" Classes="secondary conflict" Content="Desfazer este trecho" Click="OnChangePeekRevert"
+                                                ToolTip.Tip="Volta este trecho a como estava no último commit. Ctrl Z traz de volta." />
+                                        <Button Grid.Column="3" Classes="flat option" Margin="4,0,0,0" Click="OnChangePeekClose" AutomationProperties.Name="Fechar" ToolTip.Tip="Fechar (Esc)">
+                                            <Path Stroke="{DynamicResource Muted}" StrokeThickness="1.1" Data="M0 0L8 8M8 0L0 8" />
+                                        </Button>
+                                    </Grid>
+                                    <ae:TextEditor x:Name="ChangePeekEditor" Grid.Row="1" IsReadOnly="True" Background="Transparent" BorderThickness="0"
+                                                   Foreground="{DynamicResource Ink}" FontFamily="{DynamicResource CodeFont}" FontSize="13.5" Padding="0,0,0,6"
+                                                   HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" />
+                                    <TextBlock x:Name="ChangePeekNote" Grid.Row="1" IsVisible="False" Margin="12,0,12,10" FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                                </Grid>
+                            </Border>
+
+                            <!-- Aba de imagem -->
+                            <Panel x:Name="ImageHost" IsVisible="False">
+                                <e:ImagePreview x:Name="ImageView" Focusable="True" ClipToBounds="True" AutomationProperties.Name="Imagem" />
+                                <TextBlock x:Name="ImageMessage" IsVisible="False" Foreground="{DynamicResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Panel>
+
+                            <!-- Sala ou sprite do jogo, com o Inspetor à direita -->
+                            <Grid x:Name="GameHost" IsVisible="False" ColumnDefinitions="*,1,280">
+                                <Panel Grid.Column="0">
+                                    <g:RoomCanvas x:Name="RoomView" IsVisible="False" AutomationProperties.Name="Sala" />
+                                    <g:SpriteView x:Name="SpriteEditor" IsVisible="False" AutomationProperties.Name="Sprite" />
+                                    <TextBlock x:Name="GameMessage" IsVisible="False" Margin="32,0" MaxWidth="520" TextWrapping="Wrap" TextAlignment="Center"
+                                               Foreground="{DynamicResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="RoomHint" IsVisible="False" Margin="14,0,14,58" FontSize="11" Foreground="{DynamicResource Muted}"
+                                               HorizontalAlignment="Left" VerticalAlignment="Bottom" TextWrapping="Wrap"
+                                               Text="Clique coloca o objeto escolhido · arraste para mover · botão direito apaga · Alt solta da grade · roda aproxima · espaço e arrastar move a vista" />
+                                </Panel>
+                                <Border Grid.Column="1" Background="{DynamicResource Tint}" />
+                                <ScrollViewer Grid.Column="2" HorizontalScrollBarVisibility="Disabled">
+                                    <StackPanel x:Name="Inspector" Margin="14,10,14,64" Spacing="6" />
+                                </ScrollViewer>
+                            </Grid>
+
+                            <!-- Comparação lado a lado -->
+                            <Grid x:Name="DiffHost" IsVisible="False" RowDefinitions="Auto,*" Background="{DynamicResource Sheet}">
+                                <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto" Height="32" Margin="14,0,8,0">
+                                    <TextBlock x:Name="DiffTitle" Grid.Column="0" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                    <!-- Num arquivo em conflito: escolher o lado sem editar as marcas à mão. -->
+                                    <StackPanel x:Name="ConflictBar" Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="8,0" IsVisible="False">
+                                        <!-- Com vários conflitos, as setas escolhem a qual os botões se aplicam. -->
+                                        <StackPanel x:Name="ConflictNavigation" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" Margin="0,0,4,0">
+                                            <Button Classes="flat option" Click="OnConflictPrevious" AutomationProperties.Name="Conflito anterior" ToolTip.Tip="Conflito anterior">
+                                                <Path Stroke="{DynamicResource Muted}" StrokeThickness="1.3" Data="M4 0L0 4L4 8" />
+                                            </Button>
+                                            <Button Classes="flat option" Click="OnConflictNext" AutomationProperties.Name="Próximo conflito" ToolTip.Tip="Próximo conflito">
+                                                <Path Stroke="{DynamicResource Muted}" StrokeThickness="1.3" Data="M0 0L4 4L0 8" />
+                                            </Button>
+                                        </StackPanel>
+                                        <Button Classes="secondary conflict" Content="Ficar com o meu" Click="OnConflictMine" ToolTip.Tip="Mantém o lado esquerdo, deste computador" />
+                                        <Button Classes="secondary conflict" Content="Ficar com o recebido" Click="OnConflictReceived" ToolTip.Tip="Mantém o lado direito, que veio no Receber" />
+                                        <Button Classes="secondary conflict" Content="Juntar os dois" Click="OnConflictBoth" ToolTip.Tip="O seu primeiro e o recebido logo abaixo" />
+                                    </StackPanel>
+                                    <Button x:Name="DiffOpenButton" Grid.Column="2" Classes="flat" Height="24" Padding="8,0" FontSize="12" Foreground="{DynamicResource Muted}" Content="Abrir arquivo" Click="OnDiffOpenFile" />
+                                    <Button Grid.Column="3" Classes="flat option" Click="OnCloseDiff" AutomationProperties.Name="Fechar comparação" ToolTip.Tip="Fechar (Esc)">
+                                        <Path Stroke="{DynamicResource Muted}" StrokeThickness="1.1" Data="M0 0L8 8M8 0L0 8" />
+                                    </Button>
+                                </Grid>
+                                <Grid Grid.Row="1" RowDefinitions="Auto,*" ColumnDefinitions="*,1,*">
+                                    <TextBlock x:Name="DiffLeftLabel" Grid.Row="0" Grid.Column="0" Text="Último commit" FontSize="11" Foreground="{DynamicResource Muted}" Margin="14,0,0,4" />
+                                    <TextBlock x:Name="DiffRightLabel" Grid.Row="0" Grid.Column="2" Text="Agora" FontSize="11" Foreground="{DynamicResource Muted}" Margin="14,0,0,4" />
+                                    <ae:TextEditor x:Name="DiffLeft" Grid.Row="1" Grid.Column="0" IsReadOnly="True" Background="Transparent" BorderThickness="0"
+                                                   Foreground="{DynamicResource Ink}" FontFamily="{DynamicResource CodeFont}" FontSize="13.5"
+                                                   HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" />
+                                    <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Background="{DynamicResource Tint}" />
+                                    <ae:TextEditor x:Name="DiffRight" Grid.Row="1" Grid.Column="2" IsReadOnly="True" Background="Transparent" BorderThickness="0"
+                                                   Foreground="{DynamicResource Ink}" FontFamily="{DynamicResource CodeFont}" FontSize="13.5"
+                                                   HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" />
+                                </Grid>
+                            </Grid>
+
+                            <StackPanel x:Name="EmptyState" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+                                <TextBlock x:Name="EmptyTitle" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                <TextBlock x:Name="EmptyHint" Foreground="{DynamicResource Muted}" HorizontalAlignment="Center" />
+                                <StackPanel x:Name="EmptyOpenFolder" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                    <Button Classes="primary" Content="Novo jogo" Click="OnNewGame" />
+                                    <Button Classes="secondary" Content="Abrir pasta" Click="OnOpenFolder" />
+                                </StackPanel>
+                                <StackPanel x:Name="RecentPanel" Spacing="2" Margin="0,14,0,0" Width="360" IsVisible="False">
+                                    <TextBlock Text="Recentes" FontSize="11" Foreground="{DynamicResource Muted}" Margin="10,0,0,4" />
+                                    <ItemsControl x:Name="RecentList">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="s:RecentRow">
+                                                <Button Classes="flat" Height="30" Padding="10,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                                        CornerRadius="6" Click="OnRecentFolderClick" ToolTip.Tip="{Binding FullPath}">
+                                                    <Grid ColumnDefinitions="Auto,*">
+                                                        <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding Folder}" FontSize="11" Foreground="{DynamicResource Muted}"
+                                                                   Margin="10,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                    </Grid>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- Cápsula -->
+                            <Border x:Name="Capsule" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="12,0,12,12"
+                                    Width="600" Height="40" CornerRadius="20" ClipToBounds="True" Background="{DynamicResource CapsuleBackground}">
+                                <Border.Transitions>
+                                    <Transitions>
+                                        <DoubleTransition Property="Width" Duration="0:0:0.28" Easing="CubicEaseOut" />
+                                        <DoubleTransition Property="Height" Duration="0:0:0.28" Easing="CubicEaseOut" />
+                                    </Transitions>
+                                </Border.Transitions>
+                                <Grid RowDefinitions="*,40">
+                                    <Grid x:Name="TerminalArea" Grid.Row="0" RowDefinitions="Auto,*" IsVisible="False" Margin="12,8,12,0">
+                                        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,Auto,Auto,*">
+                                            <Button x:Name="TaskTabButton" Grid.Column="0" Classes="flat terminaltab" Content="Execução" Click="OnShowTask" />
+                                            <Button x:Name="ShellTabButton" Grid.Column="1" Classes="flat terminaltab" Content="Terminal" Margin="2,0,0,0" Click="OnShowShell" />
+                                            <Button x:Name="ProblemsTabButton" Grid.Column="2" Classes="flat terminaltab" Content="Problemas" Margin="2,0,0,0" Click="OnShowProblems" />
+                                            <Button x:Name="VariablesTabButton" Grid.Column="3" Classes="flat terminaltab" Content="Variáveis" Margin="2,0,0,0" IsVisible="False" Click="OnShowVariables" />
+                                            <TextBlock x:Name="TerminalInfo" Grid.Column="4" Margin="10,0,4,0" FontSize="12" FontFamily="{DynamicResource CodeFont}"
+                                                       Foreground="{DynamicResource CapsuleMuted}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                        </Grid>
+                                        <t:TerminalView x:Name="TerminalHost" Grid.Row="1" Margin="0,6,0,4"
+                                                        HorizontalAlignment="Left" VerticalAlignment="Top" />
+                                        <ScrollViewer x:Name="ProblemsScroll" Grid.Row="1" Margin="0,6,0,4" IsVisible="{Binding #ProblemsList.IsVisible}">
+                                            <ItemsControl x:Name="ProblemsList" IsVisible="False">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="s:ProblemRow">
+                                                        <Button Classes="flat terminaltab" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Click="OnProblemClick">
+                                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                                <Ellipse Grid.Column="0" Width="7" Height="7" Margin="0,0,8,0" Fill="{Binding Brush}" VerticalAlignment="Center" />
+                                                                <TextBlock Grid.Column="1" Text="{Binding Message}" Foreground="{DynamicResource CapsuleInk}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                                <TextBlock Grid.Column="2" Text="{Binding Location}" Margin="12,0,0,0" FontFamily="{DynamicResource CodeFont}" FontSize="11.5" VerticalAlignment="Center" />
+                                                            </Grid>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto">
+                                        <DockPanel x:Name="FramesBox" Grid.Column="0" Width="230" Margin="0,8,12,4" IsVisible="False">
+                                            <TextBlock DockPanel.Dock="Top" Text="Chamadas" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource CapsuleInk}" Margin="4,0,0,2" />
+                                            <ScrollViewer>
+                                                <ItemsControl x:Name="FramesList">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="s:FrameRow">
+                                                            <Button Classes="flat terminaltab" Height="22" CornerRadius="6" Padding="4,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                                                    Background="{Binding Background}" Click="OnFrameClick" ToolTip.Tip="{Binding Tip}">
+                                                                <Grid ColumnDefinitions="*,Auto">
+                                                                    <TextBlock Grid.Column="0" Text="{Binding Name}" FontFamily="{DynamicResource CodeFont}" Foreground="{DynamicResource CapsuleInk}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                                    <TextBlock Grid.Column="1" Text="{Binding Location}" Margin="10,0,0,0" FontFamily="{DynamicResource CodeFont}" FontSize="11" Foreground="{DynamicResource CapsuleMuted}" VerticalAlignment="Center" />
+                                                                </Grid>
+                                                            </Button>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+                                        </DockPanel>
+                                        <DockPanel x:Name="PageOutputBox" Grid.Column="2" Width="280" Margin="12,8,0,4" IsVisible="False">
+                                            <TextBlock DockPanel.Dock="Top" Text="A página escreveu até aqui" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource CapsuleInk}" />
+                                            <TextBlock DockPanel.Dock="Top" Text="O navegador só costuma mostrar quando ela termina." FontSize="11" Foreground="{DynamicResource CapsuleMuted}" TextWrapping="Wrap" />
+                                            <ScrollViewer x:Name="PageOutputScroll" Margin="0,4,0,0">
+                                                <TextBlock x:Name="PageOutputText" FontFamily="{DynamicResource CodeFont}" FontSize="12" Foreground="{DynamicResource CapsuleInk}" TextWrapping="Wrap" />
+                                            </ScrollViewer>
+                                        </DockPanel>
+                                        <DockPanel Grid.Column="1">
+                                        <!-- Acompanhar uma expressão, como $total * 2, a cada parada. -->
+                                        <Button x:Name="AddWatchButton" DockPanel.Dock="Top" HorizontalAlignment="Left" Classes="flat terminaltab" Height="22" Padding="6,0" Margin="2,6,0,0" IsVisible="False"
+                                                Click="OnAddWatch" ToolTip.Tip="Acompanhar o valor de uma expressão, como $total * 2, a cada parada">
+                                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                                <Path Stroke="{DynamicResource CapsuleMuted}" StrokeThickness="1.3" VerticalAlignment="Center" Data="M4 0V8M0 4H8" />
+                                                <TextBlock Text="Vigiar expressão" FontSize="12" Foreground="{DynamicResource CapsuleMuted}" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+                                        <TextBlock x:Name="VariablesHint" DockPanel.Dock="Top" Margin="10,8,0,0" FontSize="12" IsVisible="False" Foreground="{DynamicResource CapsuleMuted}" TextWrapping="Wrap" />
+                                        <ScrollViewer x:Name="VariablesScroll" Margin="0,4,0,4" IsVisible="{Binding #VariablesList.IsVisible}">
+                                            <ItemsControl x:Name="VariablesList" IsVisible="False">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="s:VariableRow">
+                                                        <Button Classes="flat terminaltab" Height="22" CornerRadius="6" Padding="4,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                                                Background="{Binding Background}" Click="OnVariableClick" ToolTip.Tip="{Binding Value}">
+                                                            <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" Margin="{Binding Indent}">
+                                                                <Path Grid.Column="0" Width="12" Margin="0,0,3,0" VerticalAlignment="Center" Stroke="{DynamicResource CapsuleMuted}" StrokeThickness="1.2" Data="{Binding Chevron}" />
+                                                                <TextBlock Grid.Column="1" Text="{Binding Name}" MinWidth="110" Margin="0,0,14,0" FontFamily="{DynamicResource CodeFont}" Foreground="{DynamicResource CapsuleMuted}" VerticalAlignment="Center" />
+                                                                <TextBlock Grid.Column="2" Text="{Binding Value}" FontFamily="{DynamicResource CodeFont}" Foreground="{DynamicResource CapsuleInk}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                                <TextBlock Grid.Column="3" Text="{Binding Type}" Margin="12,0,4,0" FontFamily="{DynamicResource CodeFont}" FontSize="11" Foreground="{DynamicResource CapsuleMuted}" VerticalAlignment="Center" />
+                                                                <Button Grid.Column="4" Classes="flat option" Width="18" Height="18" IsVisible="{Binding IsWatch}" Click="OnRemoveWatch"
+                                                                        AutomationProperties.Name="Parar de vigiar" ToolTip.Tip="Parar de vigiar">
+                                                                    <Path Stroke="{DynamicResource CapsuleMuted}" StrokeThickness="1.1" Data="M0 0L6 6M6 0L0 6" />
+                                                                </Button>
+                                                            </Grid>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                        </DockPanel>
+                                        </Grid>
+                                    </Grid>
+                                    <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto" Margin="4">
+                                    <Button x:Name="RunButton" Grid.Column="0" Classes="flat run" Click="OnRunClick" Width="96"
+                                            AutomationProperties.Name="Executar o projeto" ToolTip.Tip="Executar (F5)">
+                                        <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                            <Path x:Name="RunIcon" Fill="{DynamicResource RunInk}" VerticalAlignment="Center" Data="M1 0L9 5L1 10Z" />
+                                            <Path x:Name="StopIcon" IsVisible="False" Fill="{DynamicResource RunInk}" VerticalAlignment="Center" Data="M0 0H9V9H0Z" />
+                                            <TextBlock x:Name="RunLabel" Text="Executar" FontSize="12" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button x:Name="BranchPanel" Grid.Column="1" Classes="flat terminaltab" Margin="6,0,0,0" VerticalAlignment="Center" Click="OnBranchClick" ToolTip.Tip="Trocar de branch">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Viewbox Width="12" Height="12" VerticalAlignment="Center">
+                                            <Path Stroke="{DynamicResource CapsuleMuted}" StrokeThickness="1.4"
+                                                  Data="M5.8 3.5A1.8 1.8 0 1 1 2.2 3.5A1.8 1.8 0 1 1 5.8 3.5M5.8 12.5A1.8 1.8 0 1 1 2.2 12.5A1.8 1.8 0 1 1 5.8 12.5M13.8 5A1.8 1.8 0 1 1 10.2 5A1.8 1.8 0 1 1 13.8 5M4 5.3V10.7M12 6.8C12 9.8 4 8.3 4 10.8" />
+                                        </Viewbox>
+                                        <TextBlock x:Name="BranchName" FontSize="12" MaxWidth="110" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource CapsuleMuted}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    </Button>
+                                    <DockPanel Grid.Column="2" Margin="8,0" VerticalAlignment="Center">
+                                        <StackPanel x:Name="DebugButtons" DockPanel.Dock="Left" Orientation="Horizontal" Spacing="2" IsVisible="False">
+                                            <Button x:Name="DebugContinueButton" Classes="flat terminaltab" Click="OnDebugContinue" ToolTip.Tip="Continuar (F5)" AutomationProperties.Name="Continuar">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <Path Fill="{DynamicResource CapsuleInk}" VerticalAlignment="Center" Data="M0 0L8 4.5L0 9Z" />
+                                                    <TextBlock Text="Continuar" Foreground="{DynamicResource CapsuleInk}" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button x:Name="DebugNextButton" Classes="flat terminaltab" Click="OnDebugNext" ToolTip.Tip="Próxima linha (F10)" AutomationProperties.Name="Próxima linha">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <Path Stroke="{DynamicResource CapsuleInk}" StrokeThickness="1.4" VerticalAlignment="Center" Data="M4.5 0V9M1 5.5L4.5 9L8 5.5" />
+                                                    <TextBlock Text="Próxima linha" Foreground="{DynamicResource CapsuleInk}" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button x:Name="DebugIntoButton" Classes="flat terminaltab" Click="OnDebugInto" ToolTip.Tip="Entrar na função (F11)" AutomationProperties.Name="Entrar na função">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <Path Stroke="{DynamicResource CapsuleInk}" StrokeThickness="1.4" VerticalAlignment="Center" Data="M4.5 0V6.5M1.5 3.5L4.5 6.5L7.5 3.5M0 9.5H9" />
+                                                    <TextBlock Text="Entrar" Foreground="{DynamicResource CapsuleInk}" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button x:Name="DebugOutButton" Classes="flat terminaltab" Click="OnDebugOut" ToolTip.Tip="Sair da função (Shift F11)" AutomationProperties.Name="Sair da função">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <Path Stroke="{DynamicResource CapsuleInk}" StrokeThickness="1.4" VerticalAlignment="Center" Data="M4.5 9.5V3M1.5 6L4.5 3L7.5 6M0 0H9" />
+                                                    <TextBlock Text="Sair" Foreground="{DynamicResource CapsuleInk}" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Button>
+                                        </StackPanel>
+                                        <!-- Primeiro da fila: sem espaço na cápsula, o último é quem desaparece. -->
+                                        <Button x:Name="UpdateButton" DockPanel.Dock="Left" Classes="flat terminaltab" Foreground="{DynamicResource CapsuleInk}" IsVisible="False" Click="OnUpdateClick" ToolTip.Tip="Ver a versão nova" />
+                                        <!-- A escuta do servidor fica à vista enquanto ligada: sem isto, não havia como saber se a página ia parar. -->
+                                        <Button x:Name="ListeningButton" DockPanel.Dock="Left" Classes="flat terminaltab" IsVisible="False" Click="OnListeningClick"
+                                                ToolTip.Tip="O Canis Major está ouvindo o servidor: páginas abertas pelo Apache param nos pontos vermelhos. Para parar, use &quot;Parar de ouvir o servidor&quot; na barra de comando.">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <Ellipse Width="7" Height="7" Fill="{DynamicResource Accent}" VerticalAlignment="Center" />
+                                                <TextBlock Text="Ouvindo o servidor" Foreground="{DynamicResource CapsuleInk}" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button x:Name="ProblemsButton" DockPanel.Dock="Left" Classes="flat terminaltab" IsVisible="False" Click="OnShowProblems" ToolTip.Tip="Ver problemas" />
+                                        <Button x:Name="OpenSiteButton" DockPanel.Dock="Left" Classes="flat terminaltab" IsVisible="False" Click="OnOpenSite" Content="Abrir site" />
+                                        <Button x:Name="InstallButton" DockPanel.Dock="Left" Classes="flat terminaltab" IsVisible="False" Click="OnInstallServer" />
+                                        <TextBlock x:Name="CapsuleStatus" FontSize="12" Foreground="{DynamicResource CapsuleMuted}" TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center" Margin="4,0,0,0" />
+                                    </DockPanel>
+                                    <TextBlock x:Name="CaretPosition" Grid.Column="3" Foreground="{DynamicResource CapsuleMuted}" FontFamily="{DynamicResource CodeFont}" FontSize="11.5"
+                                               VerticalAlignment="Center" Margin="0,0,6,0" />
+                                    <Button x:Name="TerminalButton" Grid.Column="4" Classes="flat capsule" Click="OnToggleTerminal" AutomationProperties.Name="Abrir ou fechar o terminal" ToolTip.Tip="Terminal (Ctrl J)">
+                                        <Viewbox Width="15" Height="15">
+                                            <Panel Width="16" Height="16">
+                                                <Path Stroke="{DynamicResource CapsuleInk}" StrokeThickness="1.5" Data="M2.5 4L6.5 8L2.5 12M8.5 12.5H13.5" />
+                                            </Panel>
+                                        </Viewbox>
+                                    </Button>
+                                    <Button x:Name="FocusButton" Grid.Column="5" Classes="flat capsule" Click="OnToggleFocus" AutomationProperties.Name="Modo foco" ToolTip.Tip="Modo foco">
+                                        <Viewbox Width="15" Height="15">
+                                            <Panel Width="16" Height="16">
+                                                <Path Stroke="{DynamicResource CapsuleInk}" StrokeThickness="1.5" Data="M2 5.5V2H5.5M10.5 2H14V5.5M14 10.5V14H10.5M5.5 14H2V10.5" />
+                                            </Panel>
+                                        </Viewbox>
+                                    </Button>
+                                    <Button Grid.Column="6" Classes="flat capsule" Click="OnToggleTheme" AutomationProperties.Name="Trocar tema" ToolTip.Tip="Trocar tema">
+                                        <Viewbox Width="13" Height="13">
+                                            <Panel Width="16" Height="16">
+                                                <Path Stroke="{DynamicResource CapsuleInk}" StrokeThickness="1.5" Data="M8 2A6 6 0 0 1 8 14A6 6 0 0 1 8 2Z" />
+                                                <Path Fill="{DynamicResource CapsuleInk}" Data="M8 2A6 6 0 0 1 8 14Z" />
+                                            </Panel>
+                                        </Viewbox>
+                                    </Button>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+
+                            <!-- Seletor de cores do CSS -->
+                            <Border x:Name="ColorCard" IsVisible="False" Width="236" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    Padding="10" CornerRadius="12" Background="{DynamicResource Pop}">
+                                <StackPanel Spacing="10">
+                                    <Button Classes="flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Height="26" Padding="4,0"
+                                            Click="OnColorFormatClick" ToolTip.Tip="Trocar o formato" AutomationProperties.Name="Trocar o formato da cor">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Border Width="16" Height="16" CornerRadius="4" ClipToBounds="True" Background="White" VerticalAlignment="Center"
+                                                    BorderThickness="1" BorderBrush="{DynamicResource Faint}">
+                                                <Border x:Name="ColorPreview" />
+                                            </Border>
+                                            <TextBlock x:Name="ColorText" FontFamily="{DynamicResource CodeFont}" FontSize="12" Foreground="{DynamicResource Ink}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+                                    <e:ColorSquare x:Name="ColorSquareView" Height="124" />
+                                    <e:ColorStrip x:Name="HueStrip" Height="12" IsHue="True" Margin="6,0" />
+                                    <e:ColorStrip x:Name="AlphaStrip" Height="12" Margin="6,0" />
+                                </StackPanel>
+                            </Border>
+                        </Panel>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <!-- Barra de comando -->
+        <Panel x:Name="PaletteOverlay" IsVisible="False">
+            <Border Background="{DynamicResource Veil}" PointerPressed="OnOverlayPressed" />
+            <Border x:Name="PaletteCard" Width="560" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="16,44,16,16"
+                    Padding="6" CornerRadius="14" Background="{DynamicResource Pop}">
+                <StackPanel>
+                    <Grid ColumnDefinitions="Auto,*" Height="38" Margin="10,0">
+                        <Path Grid.Column="0" Stroke="{DynamicResource Muted}" StrokeThickness="1.5" VerticalAlignment="Center" Margin="0,0,10,0"
+                              Data="M12 7A5 5 0 1 1 2 7A5 5 0 1 1 12 7M11 11L14.5 14.5" />
+                        <TextBox x:Name="PaletteInput" Grid.Column="1" Classes="bare" FontSize="15" FontWeight="Medium"
+                                 PlaceholderText="O que você quer fazer?" Foreground="{DynamicResource Ink}"
+                                 AutomationProperties.Name="Buscar arquivo ou comando" />
+                    </Grid>
+                    <ScrollViewer MaxHeight="360">
+                        <ItemsControl x:Name="PaletteList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="s:CommandRow">
+                                    <Button Classes="flat" Height="30" CornerRadius="8" HorizontalAlignment="Stretch" Background="{Binding Background}" Click="OnCommandClick">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" Margin="10,0">
+                                            <Image Grid.Column="0" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" Source="{Binding Icon}" IsVisible="{Binding Icon, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="Medium" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="{Binding Hint}" Margin="14,0,0,0" MaxWidth="260" TextTrimming="CharacterEllipsis" FontSize="12" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    <TextBlock x:Name="PaletteEmpty" Text="Nada encontrado." Foreground="{DynamicResource Muted}" Margin="10,8" IsVisible="False" />
+                </StackPanel>
+            </Border>
+        </Panel>
+
+        <!-- Configurações: as seções à esquerda, e cada escolha vale na hora e fica guardada. -->
+        <Panel x:Name="SettingsOverlay" IsVisible="False">
+            <Border Background="{DynamicResource Veil}" PointerPressed="OnSettingsOverlayPressed" />
+            <Border x:Name="SettingsCard" Width="720" Height="470" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="16,44,16,16"
+                    CornerRadius="14" Background="{DynamicResource Pop}" ClipToBounds="True">
+                <Grid ColumnDefinitions="176,1,*">
+                    <!-- Seções -->
+                    <StackPanel Grid.Column="0" Margin="12,16,10,12" Spacing="2">
+                        <TextBlock Text="Configurações" FontSize="15" FontWeight="SemiBold" Margin="8,0,0,12" />
+                        <Button x:Name="SectionAparencia" Classes="flat segment section" Content="Aparência" Tag="secao:aparencia" Click="OnSettingClick" />
+                        <Button x:Name="SectionEditor" Classes="flat segment section" Content="Editor" Tag="secao:editor" Click="OnSettingClick" />
+                        <Button x:Name="SectionPhp" Classes="flat segment section" Content="PHP e depuração" Tag="secao:php" Click="OnSettingClick" />
+                        <Button x:Name="SectionGit" Classes="flat segment section" Content="Git" Tag="secao:git" Click="OnSettingClick" />
+                        <Button x:Name="SectionClaude" Classes="flat segment section" Content="Claude Code" Tag="secao:claude" Click="OnSettingClick" />
+                        <Button x:Name="SectionUpdates" Classes="flat segment section" Content="Atualizações" Tag="secao:versao" Click="OnSettingClick" />
+                    </StackPanel>
+                    <Border Grid.Column="1" Background="{DynamicResource Tint}" />
+
+                    <Grid Grid.Column="2" RowDefinitions="Auto,*,Auto" Margin="20,12,12,14">
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,6">
+                            <TextBlock x:Name="SettingsSectionTitle" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Classes="flat option" Click="OnCloseSettings" AutomationProperties.Name="Fechar configurações" ToolTip.Tip="Fechar (Esc)">
+                                <Path Stroke="{DynamicResource Muted}" StrokeThickness="1.1" Data="M0 0L8 8M8 0L0 8" />
+                            </Button>
+                        </Grid>
+
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                            <Panel>
+                                <!-- Aparência -->
+                                <StackPanel x:Name="PaneAparencia">
+                                    <Grid ColumnDefinitions="*,Auto" MinHeight="40" Margin="0,7,6,7">
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <TextBlock Text="Tema" FontWeight="Medium" />
+                                            <TextBlock Text="As cores da janela e do código." FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                            <Button x:Name="SettingThemeClaro" Classes="flat segment" Height="26" Padding="10,0" FontSize="12" Content="Claro" Tag="tema:claro" Click="OnSettingClick" />
+                                            <Button x:Name="SettingThemeGrafite" Classes="flat segment" Height="26" Padding="10,0" FontSize="12" Content="Grafite" Tag="tema:grafite" Click="OnSettingClick" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border Height="1" Background="{DynamicResource Tint}" />
+                                    <Grid ColumnDefinitions="*,Auto" MinHeight="40" Margin="0,7,6,7">
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <TextBlock Text="Tamanho da letra" FontWeight="Medium" />
+                                            <TextBlock Text="No editor. Também muda com Ctrl e a roda do mouse." FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                            <Button Classes="flat segment" Height="26" Width="28" FontSize="14" Content="−" Tag="fonte:-" Click="OnSettingClick" AutomationProperties.Name="Diminuir a letra" />
+                                            <TextBlock x:Name="SettingFontSize" MinWidth="40" TextAlignment="Center" VerticalAlignment="Center" FontFamily="{DynamicResource CodeFont}" FontSize="12" />
+                                            <Button Classes="flat segment" Height="26" Width="28" FontSize="14" Content="+" Tag="fonte:+" Click="OnSettingClick" AutomationProperties.Name="Aumentar a letra" />
+                                            <Button x:Name="SettingFontDefault" Classes="flat segment" Height="26" Padding="10,0" FontSize="12" Content="Padrão" Tag="fonte:0" Click="OnSettingClick" />
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+
+                                <!-- Editor -->
+                                <StackPanel x:Name="PaneEditor" IsVisible="False">
+                                    <Grid ColumnDefinitions="*,Auto" MinHeight="40" Margin="0,7,6,7">
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <TextBlock Text="Recuo" FontWeight="Medium" />
+                                            <TextBlock Text="Quanto o Tab e o Enter afastam a linha, também ao formatar." FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                            <Button x:Name="SettingIndent2" Classes="flat segment" Height="26" Padding="10,0" FontSize="12" Content="2 espaços" Tag="recuo:2" Click="OnSettingClick" />
+                                            <Button x:Name="SettingIndent4" Classes="flat segment" Height="26" Padding="10,0" FontSize="12" Content="4 espaços" Tag="recuo:4" Click="OnSettingClick" />
+                                            <Button x:Name="SettingIndentTab" Classes="flat segment" Height="26" Padding="10,0" FontSize="12" Content="Tab" Tag="recuo:tab" Click="OnSettingClick" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border Height="1" Background="{DynamicResource Tint}" />
+                                    <Grid ColumnDefinitions="*,Auto" MinHeight="40" Margin="0,7,6,7">
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <TextBlock Text="Fechar aspas e tags" FontWeight="Medium" />
+                                            <TextBlock Text="Aspas, parênteses, chaves e tags ganham o fechamento ao digitar." FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                            <Button x:Name="SettingPairsOn" Classes="flat segment" Height="26" Padding="10,0" FontSize="12" Content="Ligado" Tag="pares:sim" Click="OnSettingClick" />
+                                            <Button x:Name="SettingPairsOff" Classes="flat segment" Height="26" Padding="10,0" FontSize="12" Content="Desligado" Tag="pares:nao" Click="OnSettingClick" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border Height="1" Background="{DynamicResource Tint}" />
+                                    <Grid ColumnDefinitions="*,Auto" MinHeight="40" Margin="0,7,6,7">
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <TextBlock Text="Quebra de linha" FontWeight="Medium" />
+                                            <TextBlock Text="Linhas longas continuam embaixo, em vez de seguir para a direita." FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                            <Button x:Name="SettingWrapOn" Classes="flat segment" Height="26" Padding="10,0" FontSize="12" Content="Ligada" Tag="quebra:sim" Click="OnSettingClick" />
+                                            <Button x:Name="SettingWrapOff" Classes="flat segment" Height="26" Padding="10,0" FontSize="12" Content="Desligada" Tag="quebra:nao" Click="OnSettingClick" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border Height="1" Background="{DynamicResource Tint}" />
+                                    <Grid ColumnDefinitions="*,Auto" MinHeight="40" Margin="0,7,6,7">
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <TextBlock Text="Salvar sozinho" FontWeight="Medium" />
+                                            <TextBlock Text="Um segundo depois de parar de digitar, como o Auto Save do VS Code. Assim o Claude Code, o Executar e o Git veem o mesmo que a tela." FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                            <Button x:Name="SettingAutoSaveOn" Classes="flat segment" Height="26" Padding="10,0" FontSize="12" Content="Ligado" Tag="autosalvar:sim" Click="OnSettingClick" />
+                                            <Button x:Name="SettingAutoSaveOff" Classes="flat segment" Height="26" Padding="10,0" FontSize="12" Content="Desligado" Tag="autosalvar:nao" Click="OnSettingClick" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border Height="1" Background="{DynamicResource Tint}" />
+                                    <Grid ColumnDefinitions="*,Auto" MinHeight="40" Margin="0,7,6,7">
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <TextBlock Text="Prévia do SVG" FontWeight="Medium" />
+                                            <TextBlock Text="O desenho ao lado do código, num arquivo .svg. Também pelo botão Prévia, ao lado das abas." FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                            <Button x:Name="SettingSvgOn" Classes="flat segment" Height="26" Padding="10,0" FontSize="12" Content="Ligada" Tag="svg:sim" Click="OnSettingClick" />
+                                            <Button x:Name="SettingSvgOff" Classes="flat segment" Height="26" Padding="10,0" FontSize="12" Content="Desligada" Tag="svg:nao" Click="OnSettingClick" />
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+
+                                <!-- PHP e depuração -->
+                                <StackPanel x:Name="PanePhp" IsVisible="False">
+                                    <Grid ColumnDefinitions="*,Auto" MinHeight="40" Margin="0,7,6,7">
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <TextBlock Text="Comando do Executar" FontWeight="Medium" />
+                                            <TextBlock x:Name="SettingRunCommand" FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Button x:Name="SettingRunChange" Grid.Column="1" Classes="secondary conflict" Content="Alterar" Tag="executar:alterar" Click="OnSettingClick" VerticalAlignment="Center" />
+                                    </Grid>
+                                    <Border Height="1" Background="{DynamicResource Tint}" />
+                                    <Grid ColumnDefinitions="*,Auto" MinHeight="40" Margin="0,7,6,7">
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <TextBlock Text="Depurar páginas do servidor" FontWeight="Medium" />
+                                            <TextBlock Text="Para páginas abertas por outro servidor, como o Apache. A cápsula mostra Ouvindo o servidor." FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                            <Button x:Name="SettingServerOn" Classes="flat segment" Height="26" Padding="10,0" FontSize="12" Content="Ligado" Tag="servidor:sim" Click="OnSettingClick" />
+                                            <Button x:Name="SettingServerOff" Classes="flat segment" Height="26" Padding="10,0" FontSize="12" Content="Desligado" Tag="servidor:nao" Click="OnSettingClick" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Border Height="1" Background="{DynamicResource Tint}" />
+                                    <Grid ColumnDefinitions="*,Auto" MinHeight="40" Margin="0,7,6,7">
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <TextBlock Text="Xdebug no php.ini" FontWeight="Medium" />
+                                            <TextBlock Text="Tira o bloco que o Canis Major pôs no php.ini para o servidor. A cópia do original continua guardada." FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Classes="secondary conflict" Content="Tirar do php.ini" Tag="phpini:tirar" Click="OnSettingClick" VerticalAlignment="Center" />
+                                    </Grid>
+                                </StackPanel>
+
+                                <!-- Git -->
+                                <StackPanel x:Name="PaneGit" IsVisible="False">
+                                    <Grid ColumnDefinitions="*,Auto" MinHeight="40" Margin="0,7,6,7">
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <TextBlock Text="Nome nos commits" FontWeight="Medium" />
+                                            <TextBlock x:Name="SettingGitName" FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Classes="secondary conflict" Content="Alterar" Tag="git:nome" Click="OnSettingClick" VerticalAlignment="Center" />
+                                    </Grid>
+                                    <Border Height="1" Background="{DynamicResource Tint}" />
+                                    <Grid ColumnDefinitions="*,Auto" MinHeight="40" Margin="0,7,6,7">
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <TextBlock Text="E-mail nos commits" FontWeight="Medium" />
+                                            <TextBlock x:Name="SettingGitEmail" FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Classes="secondary conflict" Content="Alterar" Tag="git:email" Click="OnSettingClick" VerticalAlignment="Center" />
+                                    </Grid>
+                                    <TextBlock Text="Valem para todos os projetos deste computador e ficam públicos se você publicar um projeto. No GitHub dá para usar um endereço noreply, em Settings, Emails." FontSize="11" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" Margin="0,10,6,0" />
+                                </StackPanel>
+
+                                <!-- Claude Code -->
+                                <StackPanel x:Name="PaneClaude" IsVisible="False">
+                                    <Grid ColumnDefinitions="*,Auto" MinHeight="40" Margin="0,7,6,7">
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <TextBlock Text="Deixar o Claude Code ver o Canis Major" FontWeight="Medium" />
+                                            <TextBlock Text="O Claude Code aberto numa pasta do Canis Major passa a ver o arquivo e o trecho selecionado, os erros, a depuração e a saída do Executar. Ele só lê, e pede licença antes." FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                            <Button x:Name="SettingClaudeOn" Classes="flat segment" Height="26" Padding="10,0" FontSize="12" Content="Conectado" Tag="claude:conectar" Click="OnSettingClick" />
+                                            <Button x:Name="SettingClaudeOff" Classes="flat segment" Height="26" Padding="10,0" FontSize="12" Content="Desconectado" Tag="claude:desconectar" Click="OnSettingClick" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <TextBlock x:Name="SettingClaudeStatus" FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" Margin="0,2,6,0" />
+                                    <Border Height="1" Background="{DynamicResource Tint}" Margin="0,12,0,0" />
+                                    <TextBlock Text="Depois de conectar, abra o Claude Code no terminal do Canis Major e pergunte, por exemplo: o que faz a linha que selecionei? Ou, com a depuração parada: por que esse valor saiu errado?" FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" Margin="0,12,6,0" />
+                                </StackPanel>
+
+                                <!-- Atualizações -->
+                                <StackPanel x:Name="PaneUpdates" IsVisible="False">
+                                    <Grid ColumnDefinitions="*,Auto" MinHeight="40" Margin="0,7,6,7">
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <TextBlock Text="Aviso de versão nova" FontWeight="Medium" />
+                                            <TextBlock Text="Avisa na cápsula, sem baixar nada sozinho." FontSize="12" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                            <Button x:Name="SettingUpdatesOn" Classes="flat segment" Height="26" Padding="10,0" FontSize="12" Content="Ligado" Tag="versao:sim" Click="OnSettingClick" />
+                                            <Button x:Name="SettingUpdatesOff" Classes="flat segment" Height="26" Padding="10,0" FontSize="12" Content="Desligado" Tag="versao:nao" Click="OnSettingClick" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <TextBlock x:Name="SettingVersion" FontSize="12" Foreground="{DynamicResource Muted}" Margin="0,6,6,0" />
+                                </StackPanel>
+                            </Panel>
+                        </ScrollViewer>
+
+                        <TextBlock Grid.Row="2" Text="Cada escolha vale na hora e fica guardada para a próxima vez." FontSize="11" Foreground="{DynamicResource Muted}" Margin="0,10,0,0" />
+                    </Grid>
+                </Grid>
+            </Border>
+        </Panel>
+
+        <!-- Confirmação -->
+        <Panel x:Name="DialogOverlay" IsVisible="False">
+            <Border Background="{DynamicResource Veil}" />
+            <Border x:Name="DialogCard" Width="400" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="16"
+                    Padding="18" CornerRadius="14" Background="{DynamicResource Pop}">
+                <StackPanel Spacing="6">
+                    <TextBlock x:Name="DialogTitle" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock x:Name="DialogBody" Foreground="{DynamicResource Muted}" TextWrapping="Wrap" />
+                    <Border x:Name="DialogInputBox" Height="32" Margin="0,6,0,0" Padding="10,0" CornerRadius="8" Background="{DynamicResource Tint}" IsVisible="False">
+                        <TextBox x:Name="DialogInput" Classes="bare" Foreground="{DynamicResource Ink}" AutomationProperties.Name="Nome" />
+                    </Border>
+                    <TextBlock x:Name="DialogError" FontSize="12" Foreground="{DynamicResource Accent}" TextWrapping="Wrap" IsVisible="False" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6" Margin="0,10,0,0">
+                        <Button x:Name="DialogCancel" Classes="secondary" Content="Cancelar" Click="OnDialogCancel" />
+                        <Button x:Name="DialogSecondary" Classes="secondary" Click="OnDialogSecondary" />
+                        <Button x:Name="DialogPrimary" Classes="primary" Click="OnDialogPrimary" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Panel>
+
+        <!-- Arrastar arquivos: só aparece e não pega o mouse, para o soltar chegar na janela. -->
+        <Panel x:Name="DropOverlay" IsVisible="False" IsHitTestVisible="False">
+            <Border Background="{DynamicResource Veil}" />
+            <Border HorizontalAlignment="Center" VerticalAlignment="Center" Padding="18,12" CornerRadius="14" Background="{DynamicResource Pop}">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Path Stroke="{DynamicResource Muted}" StrokeThickness="1.5" VerticalAlignment="Center"
+                          Data="M8 1V10M4.5 6.5L8 10L11.5 6.5M1.5 11V14H14.5V11" />
+                    <TextBlock Text="Solte para abrir" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </StackPanel>
+            </Border>
+        </Panel>
+    </Panel>
+</Window>

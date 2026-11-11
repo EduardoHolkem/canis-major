@@ -334,6 +334,27 @@ pub unsafe extern "C" fn cm_load_shader(source: *const u8, len: usize) -> i32 {
     }
 }
 
+/// Confere um shader sem abrir janela nem usar a GPU, para o editor marcar os erros enquanto se digita.
+/// Devolve quantos erros achou; as linhas "LINHA: mensagem" ficam em `cm_last_error`, na mesma thread.
+#[no_mangle]
+pub unsafe extern "C" fn cm_check_shader(source: *const u8, len: usize) -> i32 {
+    let source = text_arg(source, len).to_string();
+    match std::panic::catch_unwind(|| shader::check(&source)) {
+        Ok(Ok(_)) => {
+            set_error(String::new());
+            0
+        }
+        Ok(Err(errors)) => {
+            set_error(errors.iter().map(|(l, m)| format!("{l}: {m}")).collect::<Vec<_>>().join("\n"));
+            errors.len() as i32
+        }
+        Err(_) => {
+            set_error("0: o conferidor de shaders falhou neste texto");
+            1
+        }
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn cm_set_shader_param(shader: u32, index: u32, x: f32, y: f32, z: f32, w: f32) {
     with_engine((), |e| e.gfx.set_param(shader, index, [x, y, z, w]))

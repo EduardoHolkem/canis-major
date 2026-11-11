@@ -1,0 +1,147 @@
+using AvaloniaEdit.Document;
+using CanisEditor.Core;
+using TextMateSharp.Grammars;
+using TextMateSharp.Registry;
+
+namespace CanisEditor.Editing;
+
+// Lê o documento linha a linha com a gramática da linguagem. Só analisa o que a tela pede
+// e, depois de uma edição, refaz apenas a partir da linha alterada.
+public sealed class SyntaxHighlighter
+{
+    private const int MaxDocumentChars = 5_000_000;
+    private const int MaxLineChars = 20_000;
+    private static readonly TimeSpan LineTimeout = TimeSpan.FromSeconds(1);
+
+    private readonly record struct LineResult(SyntaxToken[] Tokens, IStateStack? EndState);
+
+    // Um trecho tirado do meio de outro texto: o que já estava aberto antes dele, como o <?php.
+    private const int MaxExcerptContextLines = 20_000;
+
+    private readonly IGrammar _grammar;
+    private readonly TextDocument _document;
+    private readonly List<LineResult> _lines = new();
+    private IStateStack? _initialState;
+
+    private SyntaxHighlighter(IGrammar grammar, TextDocument document)
+    {
+        _grammar = grammar;
+        _document = document;
+        _document.Changed += OnDocumentChanged;
+    }
+
+    public static SyntaxHighlighter? ForDocument(string path, TextDocument document)
+    {
+        if (document.TextLength > MaxDocumentChars)
+            return null;
+        var grammar = GrammarCatalog.ForPath(path);
+        return grammar is null ? null : new SyntaxHighlighter(grammar, document);
+    }
+
+    // Linhas tiradas de fullText a partir de firstLine, coloridas como lá: as linhas antigas de um .php
+    // continuam dentro do <?php, e não viram texto de HTML.
+    public static SyntaxHighlighter? ForExcerpt(string path, TextDocument excerpt, string fullText, int firstLine)
+    {
+        var highlighter = ForDocument(path, excerpt);
+        if (highlighter is null || firstLine <= 1 || firstLine > MaxExcerptContextLines || fullText.Length > MaxDocumentChars)
+            return highlighter;
+
+        var whole = new SyntaxHighlighter(highlighter._grammar, new TextDocument(fullText));
+        var before = Math.Min(firstLine - 1, whole._document.LineCount);
+        whole.TokensFor(before);
+        whole.Detach();
+        highlighter._initialState = whole._lines[before - 1].EndState;
+        return highlighter;
+    }
+
+    public void Detach() => _document.Changed -= OnDocumentChanged;
+
+    public IReadOnlyList<SyntaxToken> TokensFor(int lineNumber)
+    {
+        for (var n = _lines.Count + 1; n <= lineNumber; n++)
+            _lines.Add(Tokenize(n, n > 1 ? _lines[n - 2].EndState : _initialState));
+        return _lines[lineNumber - 1].Tokens;
+    }
+
+    private LineResult Tokenize(int lineNumber, IStateStack? previous)
+    {
+        var line = _document.GetLineByNumber(lineNumber);
+        if (line.Length > MaxLineChars)
+            return new LineResult([], previous);
+
+        var text = _document.GetText(line);
+        ITokenizeLineResult result;
+        lock (GrammarCatalog.Gate)
+            result = _grammar.TokenizeLine(text, previous, LineTimeout);
+        var tokens = new List<SyntaxToken>(result.Tokens.Length);
+        foreach (var token in result.Tokens)
+        {
+            // A gramática conta uma quebra de linha invisível depois do último caractere.
+            var end = Math.Min(token.EndIndex, line.Length);
+            if (end <= token.StartIndex)
+                continue;
+            var kind = SyntaxScopes.Classify(token.Scopes, text[token.StartIndex]);
+            if (kind is not null)
+                tokens.Add(new SyntaxToken(token.StartIndex, end - token.StartIndex, kind.Value));
+        }
+        return new LineResult(tokens.ToArray(), result.RuleStack);
+    }
+
+    private void OnDocumentChanged(object? sender, DocumentChangeEventArgs e)
+    {
+        var first = _document.GetLineByOffset(e.Offset).LineNumber - 1;
+        if (first < _lines.Count)
+            _lines.RemoveRange(first, _lines.Count - first);
+    }
+}
+
+internal static class GrammarCatalog
+{
+    private const string PhpCodeScope = "source.php";
+    private const string PhpPageScope = "text.html.php";
+
+    private static readonly Dictionary<string, string> Aliases = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [".axaml"] = ".xml", [".xaml"] = ".xml", [".csproj"] = ".xml", [".slnx"] = ".xml",
+        [".props"] = ".xml", [".targets"] = ".xml", [".manifest"] = ".xml",
+        // O WGSL dos shaders do jogo se parece com Rust: fn, let, var, tipos e atributos com @.
+        [".wgsl"] = ".rs",
+    };
+
+    private static readonly RegistryOptions Options = new(ThemeName.DarkPlus);
+    private static readonly Registry GrammarRegistry = new(Options);
+    private static readonly Dictionary<string, IGrammar?> Cache = new(StringComparer.Ordinal);
+
+    // As gramáticas são compartilhadas e montam suas regras aos poucos, conforme leem o texto.
+    // Duas threads ao mesmo tempo as quebram, o que nos testes em paralelo acontecia às vezes.
+    public static readonly object Gate = new();
+
+    public static IGrammar? ForPath(string path)
+    {
+        lock (Gate)
+            return Load(path);
+    }
+
+    private static IGrammar? Load(string path)
+    {
+        var extension = Path.GetExtension(path).ToLowerInvariant();
+        if (extension.Length == 0)
+            return null;
+
+        var scope = Options.GetScopeByExtension(Aliases.GetValueOrDefault(extension, extension));
+        if (scope is null)
+            return null;
+
+        // source.php lê o arquivo inteiro como código, e aí um #fff no CSS vira comentário.
+        // Um .php é HTML com trechos de PHP, e é isso que a outra gramática entende.
+        if (scope == PhpCodeScope)
+            scope = PhpPageScope;
+
+        if (!Cache.TryGetValue(scope, out var grammar))
+        {
+            grammar = GrammarRegistry.LoadGrammar(scope);
+            Cache[scope] = grammar;
+        }
+        return grammar;
+    }
+}

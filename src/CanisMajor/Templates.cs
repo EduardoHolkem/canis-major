@@ -106,7 +106,7 @@ public static class Templates
         File.WriteAllText(path, text.Replace("\r\n", "\n"), new UTF8Encoding(false));
 
     private static void SaveRoom(string root, string name, RoomData room) =>
-        Write(Path.Combine(root, "rooms", name + ".json"), JsonSerializer.Serialize(room, GameProject.Json) + "\n");
+        Write(Path.Combine(root, "rooms", name + ".json"), RoomJson.Format(room));
 
     private static void SaveSprite(string root, string name, int w, int h, byte[] rgba, SpriteMeta meta)
     {

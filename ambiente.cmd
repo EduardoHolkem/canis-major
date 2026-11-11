@@ -12,4 +12,6 @@ echo Canis Major: ambiente pronto.
 echo   cargo build --release --manifest-path core\Cargo.toml   compila o nucleo em Rust
 echo   dotnet build CanisMajor.slnx -c Release                 compila a engine, o cm e o exemplo
 echo   dotnet run --project examples\Exemplo -c Release        joga o exemplo
-echo   dotnet test tests\CanisMajor.Tests -c Release           roda os testes
+echo   dotnet test tests\CanisMajor.Tests -c Release           roda os testes da engine
+echo   dotnet test tests\CanisMajor.Editor.Tests               roda os testes do editor
+echo   Editor.cmd                                              abre o editor
