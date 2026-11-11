@@ -75,7 +75,7 @@ public partial class MainWindow
     private void ShowDocumentSurface()
     {
         var image = ActiveDocument is { IsImage: true };
-        CodeEditor.IsVisible = ActiveDocument is not null && !image && !IsDiffOpen && !ShowsRoom;
+        CodeEditor.IsVisible = ActiveDocument is not null && !image && !IsDiffOpen && !ShowsRoom && !ShowsObject;
         CodeEditor.IsReadOnly = image;
         ImageHost.IsVisible = image && !IsDiffOpen && !ShowsSprite;
         UpdateSvgPane();
@@ -85,7 +85,7 @@ public partial class MainWindow
 
     private void FocusActiveDocument()
     {
-        if (ShowsRoom)
+        if (ShowsRoom || ShowsObject)
             RoomView.Focus();
         else if (ShowsSprite)
             SpriteEditor.Focus();

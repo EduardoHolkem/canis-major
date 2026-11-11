@@ -83,6 +83,7 @@ public class TemplateTests
     }
 }
 
+[Collection("Runtime")]
 public class CollisionTests
 {
     private class Caixa : GameObject

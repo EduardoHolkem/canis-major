@@ -102,6 +102,34 @@ public class Jogador : GameObject
 
 Cores aceitam texto: `Color = "#9DB8E0"`.
 
+## Objetos e componentes
+
+Cada objeto tem uma **ficha** (`objects/Nome.json`), editada no Inspetor: sprite, shader, profundidade, visível, ordenar por Y, cor, alpha, escala e **componentes**. O script C# (`objects/Nome.cs`) é opcional e continua sendo o lugar do código. A ficha é aplicada depois do construtor, então o que estiver nela vale mais.
+
+No editor, abra o objeto e clique em **Objeto** no alto para ver a ficha (o botão **Script** volta para o código). Um objeto só com ficha, sem script, já funciona e aparece na lista e no pincel da sala.
+
+Componentes prontos, escolhidos em **+ Componente**:
+
+| Componente | O que faz |
+|---|---|
+| `Motion` | Velocidade X e Y, gravidade, atrito, velocidade máxima e o tipo de objeto sólido em que para |
+| `Collider` | Máscara de colisão própria (deslocamento, largura e altura), com a opção de desenhar para conferir |
+| `ShaderParams` | Manda valores para o `param(0)` do shader do objeto, com o tempo do jogo se quiser |
+| `Lifetime` | Destrói o objeto depois de alguns segundos |
+
+Os seus componentes são classes que herdam de `Component`, com `Owner` (o objeto) e os eventos `OnCreate`, `OnStep`, `OnDraw` e `OnDestroy`. No código, `Add<Motion>()`, `Get<Motion>()` e `Remove()` mexem nos componentes durante o jogo.
+
+```json
+{
+  "sprite": "jogador",
+  "layer": 10,
+  "components": [
+    { "type": "Motion", "gravity": 600, "solid": "Parede" },
+    { "type": "Collider", "offset_x": -6, "offset_y": 0, "width": 12, "height": 8 }
+  ]
+}
+```
+
 ## Salas e camadas
 
 Como no GameMaker, a sala é uma pilha de **camadas**. No editor, o Inspetor da sala mostra a lista de camadas (a de cima fica na frente), com o olho para esconder, **+ Instâncias** e **+ Fundo** para criar, **Subir** e **Descer** para mudar a ordem. O pincel coloca as instâncias na camada ativa, e cada instância pode trocar de camada no Inspetor.

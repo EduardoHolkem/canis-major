@@ -105,6 +105,21 @@ public sealed class GameProject
         }
     }
 
+    /// <summary>A ficha do objeto (objects/Nome.json), ou null se ele não tiver uma.</summary>
+    public ObjectDef? LoadObjectDef(string name)
+    {
+        var path = Path.Combine(Folder("object"), name + ".json");
+        if (!File.Exists(path)) return null;
+        try
+        {
+            return JsonSerializer.Deserialize<ObjectDef>(File.ReadAllText(path), Json) ?? new ObjectDef();
+        }
+        catch (JsonException e)
+        {
+            throw new GameException($"{path}: {e.Message}");
+        }
+    }
+
     public static SpriteMeta LoadSpriteMeta(string pngPath)
     {
         var meta = Path.ChangeExtension(pngPath, ".json");

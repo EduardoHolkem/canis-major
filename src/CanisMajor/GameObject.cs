@@ -56,6 +56,57 @@ public abstract class GameObject
     /// <summary>Quando o objeto é destruído.</summary>
     public virtual void OnDestroy() { }
 
+    // ---------- componentes ----------
+
+    private readonly List<Component> _components = [];
+
+    /// <summary>Os componentes do objeto, na ordem em que rodam.</summary>
+    public IReadOnlyList<Component> Components => _components;
+
+    /// <summary>Pendura um componente no objeto. Devolve o próprio componente, para ajustar na mesma linha.</summary>
+    public T Add<T>(T component) where T : Component
+    {
+        component.Owner = this;
+        _components.Add(component);
+        return component;
+    }
+
+    public T Add<T>() where T : Component, new() => Add(new T());
+
+    /// <summary>O primeiro componente do tipo, ou null.</summary>
+    public T? Get<T>() where T : Component
+    {
+        foreach (var c in _components)
+            if (c is T found) return found;
+        return null;
+    }
+
+    public void Remove(Component component) => _components.Remove(component);
+
+    internal void StepComponents(float dt)
+    {
+        for (var i = 0; i < _components.Count && Alive; i++)
+            if (_components[i].Enabled) _components[i].OnStep(dt);
+    }
+
+    internal void DrawComponents()
+    {
+        foreach (var c in _components)
+            if (c.Enabled) c.OnDraw();
+    }
+
+    internal void CreateComponents()
+    {
+        foreach (var c in _components.ToArray())
+            c.OnCreate();
+    }
+
+    internal void DestroyComponents()
+    {
+        foreach (var c in _components.ToArray())
+            c.OnDestroy();
+    }
+
     // ---------- ajudas ----------
 
     public void DrawSelf() => Runtime.DrawObject(this);
@@ -68,6 +119,9 @@ public abstract class GameObject
     /// <summary>Retângulo de colisão (esquerda, topo, direita, base), sem considerar a rotação.</summary>
     public (float Left, float Top, float Right, float Bottom) BBox(float dx = 0, float dy = 0)
     {
+        // Um Collider troca o retângulo do sprite por uma máscara própria.
+        if (Get<Collider>() is { Enabled: true } c)
+            return (X + dx + c.OffsetX, Y + dy + c.OffsetY, X + dx + c.OffsetX + c.Width, Y + dy + c.OffsetY + c.Height);
         if (Runtime.SpriteInfo(Sprite) is not { } s) return (X + dx, Y + dy, X + dx, Y + dy);
         var left = X + dx - s.OriginX * ScaleX;
         var top = Y + dy - s.OriginY * ScaleY;

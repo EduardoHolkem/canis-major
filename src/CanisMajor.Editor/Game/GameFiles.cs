@@ -19,7 +19,7 @@ public static partial class GameFiles
     public static readonly GameSection[] Sections =
     [
         new("room", "rooms", "Salas", "sala", [".json"]),
-        new("object", "objects", "Objetos", "objeto", [".cs"]),
+        new("object", "objects", "Objetos", "objeto", [".cs", ".json"]),
         new("sprite", "sprites", "Sprites", "sprite", [".png"]),
         new("shader", "shaders", "Shaders", "shader", [".wgsl"]),
         new("sound", "sounds", "Sons", "som", [".wav", ".ogg"]),
@@ -53,6 +53,8 @@ public static partial class GameFiles
         {
             return Directory.EnumerateFiles(folder)
                 .Where(path => section.Extensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
+                // Um objeto com script e ficha aparece uma vez só, pelo script.
+                .Where(path => kind != "object" || !IsObjectDefFile(path) || !File.Exists(Path.ChangeExtension(path, ".cs")))
                 .OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase)
                 .Select(path => new GameResource(kind, Path.GetFileNameWithoutExtension(path), path))
                 .ToList();
@@ -81,6 +83,8 @@ public static partial class GameFiles
     public static bool IsRoom(string? root, string path) => KindOf(root, path) == "room";
 
     public static bool IsSprite(string? root, string path) => KindOf(root, path) == "sprite";
+
+    public static bool IsObjectDefFile(string path) => string.Equals(Path.GetExtension(path), ".json", StringComparison.OrdinalIgnoreCase);
 
     public static ProjectInfo Info(string root)
     {
@@ -121,6 +125,28 @@ public static partial class GameFiles
                     : null;
                 var layer = LayerPattern().Match(body) is { Success: true } l && int.TryParse(l.Groups["layer"].Value, out var n) ? n : 0;
                 objects[name] = new GameObjectInfo(name, sprite, layer, file.Path);
+            }
+        }
+        // A ficha (Nome.json) vale mais que o construtor, e um objeto só com ficha também existe.
+        var folder = FolderOf(root, "object");
+        if (Directory.Exists(folder))
+        {
+            foreach (var path in Directory.EnumerateFiles(folder, "*.json"))
+            {
+                var name = Path.GetFileNameWithoutExtension(path);
+                ObjectDef? def;
+                try
+                {
+                    def = System.Text.Json.JsonSerializer.Deserialize<ObjectDef>(File.ReadAllText(path), GameProject.Json);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+                {
+                    continue;
+                }
+                if (def is null)
+                    continue;
+                objects.TryGetValue(name, out var known);
+                objects[name] = new GameObjectInfo(name, def.Sprite ?? known?.Sprite ?? (sprites.Contains(name) ? name : null), def.Layer ?? known?.Layer ?? 0, known?.Path ?? path);
             }
         }
         return objects;

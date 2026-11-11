@@ -58,6 +58,7 @@ internal static unsafe class Runtime
             foreach (var t in types)
                 if (t is { IsAbstract: false, IsClass: true } && t.IsSubclassOf(typeof(GameObject)) && t.GetConstructor(Type.EmptyTypes) != null)
                     Types[t.Name] = t;
+                else ComponentTypes.Register(t);
         }
     }
 
@@ -149,6 +150,7 @@ internal static unsafe class Runtime
         {
             o.Alive = false;
             o.OnDestroy();
+            o.DestroyComponents();
         }
         Instances = [];
         Room = name;
@@ -183,7 +185,7 @@ internal static unsafe class Runtime
                 if (!layer.Visible) obj.Visible = false;
             }
             ApplyProps(obj, inst);
-            obj.OnCreate();
+            Create(obj);
         }
     }
 
@@ -199,7 +201,11 @@ internal static unsafe class Runtime
         {
             while (next < backgrounds.Count && backgrounds[next].Depth <= o.Layer)
                 DrawBackground(backgrounds[next++]);
-            if (o.Visible && o.Alive) o.OnDraw();
+            if (o.Visible && o.Alive)
+            {
+                o.OnDraw();
+                o.DrawComponents();
+            }
         }
         while (next < backgrounds.Count)
             DrawBackground(backgrounds[next++]);
@@ -243,20 +249,64 @@ internal static unsafe class Runtime
 
     public static GameObject Spawn(string kind, float x, float y, bool create = true)
     {
-        if (!Types.TryGetValue(kind, out var type))
-            throw new GameException($"O objeto '{kind}' não existe. Crie a classe {kind} : GameObject em objects/.");
-        return Spawn(type, x, y, create);
+        if (Types.TryGetValue(kind, out var type))
+            return Spawn(type, x, y, create);
+        // Sem classe, mas com a ficha em objects/Nome.json: o objeto existe só com os componentes.
+        if (ObjectDefOf(kind) is not null)
+            return Spawn(typeof(DefinedObject), x, y, create, kind);
+        throw new GameException($"O objeto '{kind}' não existe. Crie a classe {kind} : GameObject em objects/ ou a ficha objects/{kind}.json.");
     }
 
-    public static GameObject Spawn(Type type, float x, float y, bool create = true)
+    public static GameObject Spawn(Type type, float x, float y, bool create = true) => Spawn(type, x, y, create, null);
+
+    private static GameObject Spawn(Type type, float x, float y, bool create, string? kind)
     {
         var obj = (GameObject)Activator.CreateInstance(type)!;
-        obj.Kind = type.Name;
+        obj.Kind = kind ?? type.Name;
         obj.X = x;
         obj.Y = y;
+        ApplyDef(obj);
         Instances.Add(obj);
-        if (create) obj.OnCreate();
+        if (create) Create(obj);
         return obj;
+    }
+
+    internal static void Create(GameObject obj)
+    {
+        obj.OnCreate();
+        obj.CreateComponents();
+    }
+
+    // ---------- fichas dos objetos ----------
+
+    private static readonly Dictionary<string, ObjectDef?> Defs = new(StringComparer.OrdinalIgnoreCase);
+    public static Func<string, ObjectDef?>? DefOverride; // para os testes
+
+    public static ObjectDef? ObjectDefOf(string kind)
+    {
+        if (DefOverride != null) return DefOverride(kind);
+        if (Project is null) return null;
+        if (!Defs.TryGetValue(kind, out var def))
+            Defs[kind] = def = Project.LoadObjectDef(kind);
+        return def;
+    }
+
+    // A ficha vem depois do construtor: o que o Inspetor diz vale mais que o padrão da classe.
+    internal static void ApplyDef(GameObject obj)
+    {
+        if (ObjectDefOf(obj.Kind) is not { } def) return;
+        if (def.Sprite is not null) obj.Sprite = def.Sprite;
+        if (def.Shader is not null) obj.Shader = def.Shader;
+        if (def.Layer is { } layer) obj.Layer = layer;
+        if (def.Visible is { } visible) obj.Visible = visible;
+        if (def.YSort is { } ysort) obj.YSort = ysort;
+        if (def.SortOffset is { } offset) obj.SortOffset = offset;
+        if (def.Color is { } color) obj.Color = Color.Hex(color);
+        if (def.Alpha is { } alpha) obj.Alpha = alpha;
+        if (def.ScaleX is { } sx) obj.ScaleX = sx;
+        if (def.ScaleY is { } sy) obj.ScaleY = sy;
+        foreach (var json in def.Components)
+            obj.Add(ComponentTypes.Create(json, $"objects/{obj.Kind}.json"));
     }
 
     public static void Destroy(GameObject obj)
@@ -264,6 +314,7 @@ internal static unsafe class Runtime
         if (!obj.Alive) return;
         obj.Alive = false;
         obj.OnDestroy();
+        obj.DestroyComponents();
     }
 
     public static IEnumerable<GameObject> InstancesOf(string? kind) =>
@@ -425,7 +476,10 @@ internal static unsafe class Runtime
             if (Dt > 0) Fps = Fps <= 0 ? 1 / Dt : Fps * 0.9f + 0.1f / Dt;
 
             foreach (var o in Instances.ToArray())
+            {
                 if (o.Alive) o.OnStep(Dt);
+                if (o.Alive) o.StepComponents(Dt);
+            }
             Instances.RemoveAll(o => !o.Alive);
 
             foreach (var o in Instances)

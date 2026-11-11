@@ -13,7 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(CanisMajorRoot)\src\CanisMajor\CanisMajor.csproj" />
-    <Content Include="projeto.json;sprites\**;rooms\**;shaders\**;sounds\**" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="projeto.json;sprites\**;rooms\**;shaders\**;sounds\**;objects\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- Ao exportar (cm export ou Exportar jogo no editor): um .exe só, sem janela de console. -->

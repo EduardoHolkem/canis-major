@@ -169,6 +169,13 @@ public partial class MainWindow
 
     private bool ShowsRoom => IsRoomDocument && !_roomAsCode.Contains(ActiveDocument!.FullPath);
 
+    private bool IsObjectDocument => ActiveDocument is { IsImage: false } document && !IsDiffOpen && GameFiles.KindOf(RootFolder, document.FullPath) == "object";
+
+    // O script (.cs) abre no código, e o botão mostra a ficha. A ficha sozinha (.json) já abre como ficha.
+    private bool ShowsObject => IsObjectDocument && (IsObjectJson(ActiveDocument!.FullPath) ? !_roomAsCode.Contains(ActiveDocument.FullPath) : _roomAsCode.Contains(ActiveDocument.FullPath));
+
+    private static bool IsObjectJson(string path) => string.Equals(Path.GetExtension(path), ".json", StringComparison.OrdinalIgnoreCase);
+
     private bool ShowsSprite => ActiveDocument is { IsImage: true } document && !IsDiffOpen && GameFiles.IsSprite(RootFolder, document.FullPath);
 
     // Chamado sempre que a aba ou a superfície muda.
@@ -176,9 +183,11 @@ public partial class MainWindow
     {
         var room = ShowsRoom;
         var sprite = ShowsSprite;
-        RoomCodeToggle.IsVisible = IsRoomDocument;
-        RoomCodeToggle.Content = room ? "Código" : "Sala";
-        GameHost.IsVisible = room || sprite;
+        var objectForm = ShowsObject;
+        RoomCodeToggle.IsVisible = IsRoomDocument || IsObjectDocument;
+        RoomCodeToggle.Content = IsObjectDocument ? (objectForm ? (IsObjectJson(ActiveDocument!.FullPath) ? "JSON" : "Script") : "Objeto") : room ? "Código" : "Sala";
+        GameHost.IsVisible = room || sprite || objectForm;
+        ObjectView.IsVisible = objectForm;
         RoomHint.IsVisible = room;
         SpriteEditor.IsVisible = sprite;
         GameMessage.IsVisible = false;
@@ -209,7 +218,7 @@ public partial class MainWindow
 
     public void ToggleRoomCode()
     {
-        if (!IsRoomDocument)
+        if (!IsRoomDocument && !IsObjectDocument)
             return;
         var path = ActiveDocument!.FullPath;
         if (!_roomAsCode.Remove(path))
@@ -389,6 +398,8 @@ public partial class MainWindow
             BuildRoomInspector(_room);
         else if (ShowsSprite)
             BuildSpriteInspector();
+        else if (ShowsObject)
+            BuildObjectInspector();
 
         if (focusedTag is not null && FindInspectorControl(focusedTag) is { } again)
             Dispatcher.UIThread.Post(() => again.Focus());
