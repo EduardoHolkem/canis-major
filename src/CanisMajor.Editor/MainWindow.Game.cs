@@ -192,7 +192,8 @@ public partial class MainWindow
         var tileset = ShowsTileset;
         RoomCodeToggle.IsVisible = IsRoomDocument || IsObjectDocument || IsTilesetDocument;
         RoomCodeToggle.Content = IsTilesetDocument ? (tileset ? "JSON" : "Tileset") : IsObjectDocument ? (objectForm ? (IsObjectJson(ActiveDocument!.FullPath) ? "JSON" : "Script") : "Objeto") : room ? "Código" : "Sala";
-        GameHost.IsVisible = room || sprite || objectForm || tileset;
+        GameHost.IsVisible = room || sprite || objectForm || tileset || ShowsBlocks;
+        UpdateBlocksSurface();
         TilesetHost.IsVisible = tileset;
         if (tileset)
             ShowTileset();
@@ -286,6 +287,9 @@ public partial class MainWindow
             LoadRoomFromDocument();
             BuildInspector();
         }
+        // O texto mudou por fora dos blocos (desfazer, disco): os blocos acompanham.
+        if (!_writingBlocks && ShowsBlocks)
+            LoadBlocks();
         if (IsShader(document.FullPath))
         {
             _shaderDelay?.Stop();
@@ -412,6 +416,8 @@ public partial class MainWindow
             BuildObjectInspector();
         else if (ShowsTileset)
             BuildTilesetInspector();
+        else if (ShowsBlocks)
+            BuildBlocksPalette();
 
         if (focusedTag is not null && FindInspectorControl(focusedTag) is { } again)
             Dispatcher.UIThread.Post(() => again.Focus());

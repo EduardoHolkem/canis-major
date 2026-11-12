@@ -31,6 +31,8 @@
     <PackageReference Include="Avalonia.AvaloniaEdit" Version="12.0.0" />
     <PackageReference Include="Avalonia.Desktop" Version="12.1.5" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.5" />
+    <!-- O leitor de C# da Microsoft, para converter o script em blocos e de volta. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
     <PackageReference Include="Svg.Skia" Version="5.1.1" />
     <PackageReference Include="TextMateSharp.Grammars" Version="2.0.5" />
   </ItemGroup>

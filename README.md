@@ -130,6 +130,18 @@ Os seus componentes são classes que herdam de `Component`, com `Owner` (o objet
 }
 ```
 
+## C# Código e C# Blocos
+
+O script de um objeto se escreve de dois jeitos, e os dois são o mesmo arquivo `.cs`. Abra o script e use o botão **C# Blocos** no alto (o mesmo botão, agora **C# Código**, volta para o texto).
+
+- **Os eventos** aparecem como faixas rosadas: **Ao criar**, **A cada quadro**, **Ao desenhar** e **Ao destruir**. Um evento que ainda não existe aparece como botão **+**.
+- **Os blocos** se empilham dentro dos eventos. Os de controle (**se**, **se / senão**, **repetir**, **enquanto**, **para cada**) abraçam os de dentro, e o **+ senão** põe ou tira a parte do senão.
+- **Arrastar:** pegue o bloco pela alça ⠿ e solte numa das faixas entre os blocos, inclusive dentro de outro bloco. Arrastar um bloco de controle leva tudo o que está dentro.
+- **Valores editáveis:** cada valor é uma caixa de texto com C# de verdade (`speed * dt`, `Keys.Held("left")`, `"texto"`). Enter confirma. Nas chamadas, **+** e **−** põem e tiram valores.
+- **Paleta**, no Inspetor e por categoria (Controle, Variáveis, Movimento e objetos, Desenho, som e salas, IA e luz, Outros): clique para pôr depois do bloco escolhido, ou arraste para o lugar certo.
+
+**Equivalentes e conversíveis.** Cada mudança nos blocos reescreve o C#, e o código escrito à mão vira blocos ao trocar de modo. Só o corpo dos eventos é refeito: usings, campos, construtor, outros métodos e comentários de fora ficam exatamente como estavam. Ir e voltar entre os modos não muda nada (há teste para isso). Um comando sem bloco próprio (como um `switch`) aparece como um bloco **C#** com o texto dentro, então nada se perde. Se o código tiver um erro de C#, os blocos esperam você corrigir no modo código, para não estragar o arquivo.
+
 ## Objeto com IA
 
 O componente **AI** dá cérebro a inimigos, guardas, animais e ajudantes, sem código. O jeito mais rápido é **+ › Novo objeto com IA** e escolher um papel: Guarda que patrulha, Perseguidor, Sentinela, Medroso que foge, Ajudante que segue ou Andarilho. A ficha já nasce ajustada, e é só escolher o sprite.

@@ -48,6 +48,8 @@ public partial class App : Application
         {
             if (options.Open is { } file)
                 window.OpenFile(file);
+            if (options.Blocks)
+                window.ToggleBlocks();
             await Task.Delay(TimeSpan.FromSeconds(options.Wait));
             window.SaveShot(options.Shot!);
             File.Delete(settingsPath);
@@ -56,11 +58,12 @@ public partial class App : Application
         return window;
     }
 
-    private sealed record StartOptions(string? Start, string? Shot, string? Open, string? Theme, double Wait)
+    private sealed record StartOptions(string? Start, string? Shot, string? Open, string? Theme, double Wait, bool Blocks = false)
     {
         public static StartOptions Parse(string[] args)
         {
             string? start = null, shot = null, open = null, theme = null;
+            var blocks = false;
             var wait = 1.5;
             for (var i = 0; i < args.Length; i++)
             {
@@ -75,6 +78,9 @@ public partial class App : Application
                     case "--theme" when i + 1 < args.Length:
                         theme = args[++i];
                         break;
+                    case "--blocks":
+                        blocks = true;
+                        break;
                     case "--wait" when i + 1 < args.Length:
                         wait = double.Parse(args[++i], System.Globalization.CultureInfo.InvariantCulture);
                         break;
@@ -83,7 +89,7 @@ public partial class App : Application
                         break;
                 }
             }
-            return new StartOptions(start, shot, open, theme, wait);
+            return new StartOptions(start, shot, open, theme, wait, blocks);
         }
     }
 

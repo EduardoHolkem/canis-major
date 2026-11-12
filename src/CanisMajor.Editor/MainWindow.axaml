@@ -375,7 +375,7 @@
                 <!-- Folha do editor -->
                 <Border x:Name="SheetBorder" Grid.Column="2" Background="{DynamicResource Sheet}" CornerRadius="12" ClipToBounds="True">
                     <Grid RowDefinitions="Auto,*">
-                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto,Auto" MinHeight="34" Margin="6,2,14,0">
+                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto" MinHeight="34" Margin="6,2,14,0">
                             <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
                                 <ItemsControl x:Name="TabList">
                                     <ItemsControl.ItemsPanel>
@@ -410,6 +410,9 @@
                             <!-- Numa sala do jogo: o editor visual ou o JSON. -->
                             <Button x:Name="RoomCodeToggle" Grid.Column="4" Classes="flat segment" Height="24" Padding="9,0" Margin="10,0,0,0" FontSize="12"
                                     Content="Código" IsVisible="False" Click="OnRoomCodeToggle" ToolTip.Tip="Alternar entre a sala desenhada e o texto dela" />
+                            <!-- No script de um objeto: C# Código ou C# Blocos. -->
+                            <Button x:Name="BlocksToggle" Grid.Column="5" Classes="flat segment" Height="24" Padding="9,0" Margin="10,0,0,0" FontSize="12"
+                                    Content="C# Blocos" IsVisible="False" Click="OnBlocksToggle" ToolTip.Tip="Alternar entre C# Código e C# Blocos" />
                         </Grid>
 
                         <Panel x:Name="SheetHost" Grid.Row="1">
@@ -472,6 +475,8 @@
                                     <ScrollViewer x:Name="TilesetHost" IsVisible="False" HorizontalScrollBarVisibility="Auto">
                                         <g:TilesetView x:Name="TilesetEditor" EditSolid="True" Margin="24" HorizontalAlignment="Left" VerticalAlignment="Top" AutomationProperties.Name="Tileset" />
                                     </ScrollViewer>
+                                    <!-- C# Blocos: o script do objeto em blocos de encaixar. -->
+                                    <g:BlockView x:Name="BlockEditor" IsVisible="False" AutomationProperties.Name="Blocos" />
                                     <ScrollViewer x:Name="ObjectView" IsVisible="False" HorizontalScrollBarVisibility="Disabled">
                                         <StackPanel x:Name="ObjectSummary" Margin="32,24" Spacing="10" MaxWidth="560" HorizontalAlignment="Left" />
                                     </ScrollViewer>
