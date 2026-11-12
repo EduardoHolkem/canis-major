@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>CanisMajor</RootNamespace>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <Description>Canis Major: engine de jogos 2D com núcleo em Rust (wgpu) e jogos em C#.</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>

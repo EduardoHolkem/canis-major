@@ -12,7 +12,7 @@ Engine de jogos **2D** com **núcleo em Rust** e **jogos em C#**, com **shaders*
 </div>
 
 > [!NOTE]
-> Versão 0.3. O núcleo, a API de jogos, o editor, a exportação de jogos e a atualização pelo GitHub Releases funcionam.
+> Versão 0.4. Além do núcleo, da API, do editor, da exportação e da atualização pelo GitHub Releases: salas com camadas, componentes, tilemap, editor de sprites, iluminação 2D, objeto com IA e C# Blocos.
 
 ## Instalar
 

@@ -15,7 +15,7 @@ public sealed class ProjectInfo
     public int Scale { get; set; } = 2;
     public int Fps { get; set; } = 60;
     public bool PixelArt { get; set; } = true;
-    public string Engine { get; set; } = "0.3.0";
+    public string Engine { get; set; } = "0.4.0";
 }
 
 /// <summary>Uma sala (rooms/nome.json).</summary>
