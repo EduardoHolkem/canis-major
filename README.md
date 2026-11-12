@@ -130,6 +130,36 @@ Os seus componentes são classes que herdam de `Component`, com `Owner` (o objet
 }
 ```
 
+## Objeto com IA
+
+O componente **AI** dá cérebro a inimigos, guardas, animais e ajudantes, sem código. O jeito mais rápido é **+ › Novo objeto com IA** e escolher um papel: Guarda que patrulha, Perseguidor, Sentinela, Medroso que foge, Ajudante que segue ou Andarilho. A ficha já nasce ajustada, e é só escolher o sprite.
+
+| Campo | O que faz |
+|---|---|
+| `Behavior` | O que faz quando não vê o alvo: `idle` (parado), `wander` (anda à toa perto de casa), `patrol` (segue os pontos) ou `follow` (acompanha o alvo) |
+| `Target` e `OnSight` | O tipo que ela observa (como `Jogador`) e o que faz ao ver: `chase` (persegue), `flee` (foge) ou `none` |
+| `SightRange`, `LineOfSight`, `ForgetSeconds` | Alcance da visão, se paredes escondem o alvo e quanto tempo leva para desistir |
+| `Speed`, `RunSpeed` | Velocidade andando e correndo (perseguindo ou fugindo) |
+| `Solid`, `Pathfinding`, `Cell` | O que bloqueia (objeto ou camada de tiles), se desvia pelo caminho mais curto (A*) e o tamanho da célula |
+| `PatrolPoints`, `PingPong`, `Wait` | Pontos da patrulha (`"64,64; 192,64"`), ida e volta, e a pausa em cada ponto |
+| `WanderRadius`, `StopDistance`, `SafeDistance` | Até onde anda à toa, a que distância para do alvo e até onde foge |
+| `Debug` | Desenha o caminho, o alcance da visão e o estado, para conferir no jogo |
+
+No código, a IA obedece ordens e avisa quando muda de ideia:
+
+```csharp
+var ai = Get<AI>()!;
+ai.StateChanged += (antes, agora) => { if (agora == "chase") Game.PlaySound("alerta"); };
+ai.GoTo(200, 120);          // anda até o ponto e para
+ai.Chase(Game.First<Jogador>()!);
+ai.Flee(explosao);
+ai.Stop();                  // fica parada
+ai.Resume();                // volta a decidir sozinha
+if (ai.CanSee(jogador)) { }
+```
+
+O pathfinding também serve sozinho: `Pathfinding.Find(x0, y0, x1, y1, solid: "Parede")` devolve os pontos do caminho (ou null), e `Pathfinding.LineBlocked(...)` diz se há parede no meio. Desvia de objetos sólidos e de tiles sólidos, não corta quinas e simplifica o caminho para não andar em zigue-zague. Na sala `noite` do Exemplo, dois fantasmas andam à toa e perseguem o jogador.
+
 ## Salas e camadas
 
 Como no GameMaker, a sala é uma pilha de **camadas**. No editor, o Inspetor da sala mostra a lista de camadas (a de cima fica na frente), com o olho para esconder, **+ Instâncias** e **+ Fundo** para criar, **Subir** e **Descer** para mudar a ordem. O pincel coloca as instâncias na camada ativa, e cada instância pode trocar de camada no Inspetor.

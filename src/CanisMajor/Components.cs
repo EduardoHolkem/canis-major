@@ -134,6 +134,7 @@ public static class ComponentTypes
         [nameof(Lifetime)] = typeof(Lifetime),
         [nameof(Light)] = typeof(Light),
         [nameof(ShadowCaster)] = typeof(ShadowCaster),
+        [nameof(AI)] = typeof(AI),
     };
 
     public static void Register(Type type)

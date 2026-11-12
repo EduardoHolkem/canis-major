@@ -1,0 +1,23 @@
+{
+  "sprite": "jogador",
+  "color": "#FF8080",
+  "layer": 9,
+  "components": [
+    {
+      "type": "AI",
+      "behavior": "wander",
+      "on_sight": "chase",
+      "sight_range": 110,
+      "speed": 35,
+      "run_speed": 60,
+      "solid": "Parede"
+    },
+    {
+      "type": "Light",
+      "color": "#FF5050",
+      "radius": 48,
+      "intensity": 0.8,
+      "cast_shadows": false
+    }
+  ]
+}

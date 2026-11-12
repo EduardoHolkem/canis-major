@@ -799,6 +799,7 @@ public partial class MainWindow
     private void OnNewShader(object? sender, RoutedEventArgs e) => _ = CreateResourceAsync("shader");
     private void OnNewShaderPreset(object? sender, RoutedEventArgs e) => ChooseShaderPreset();
     private void OnNewTileset(object? sender, RoutedEventArgs e) => _ = CreateResourceAsync("tileset");
+    private void OnNewAiObject(object? sender, RoutedEventArgs e) => ChooseAiPreset();
 
     public async Task CreateResourceAsync(string kind)
     {
@@ -995,6 +996,7 @@ public partial class MainWindow
         actions.Add(("Novo shader", "shaders/", () => _ = CreateResourceAsync("shader")));
         actions.Add(("Novo shader de um preset", "brilho, contorno, dissolver, CRT...", ChooseShaderPreset));
         actions.Add(("Novo tileset", "tilesets/", () => _ = CreateResourceAsync("tileset")));
+        actions.Add(("Novo objeto com IA", "guarda, perseguidor, medroso, ajudante...", ChooseAiPreset));
         actions.Add(("Exportar jogo", "Pasta e .zip em export/", () => _ = ExportGameAsync()));
         actions.Add((IsGameView ? "Mostrar os arquivos" : "Mostrar os recursos do jogo", "Lista ao lado", () => SetGameView(!IsGameView)));
         if (IsRoomDocument)

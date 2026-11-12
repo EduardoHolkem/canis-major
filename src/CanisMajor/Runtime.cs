@@ -187,6 +187,7 @@ internal static unsafe partial class Runtime
         Background = Color.Hex(room.Background);
         PostShaders = [.. room.PostShaders];
         Lighting.Reset();
+        Pathfinding.Invalidate();
         if (room.Lighting is { } lighting)
         {
             Lighting.Enabled = lighting.Enabled;
