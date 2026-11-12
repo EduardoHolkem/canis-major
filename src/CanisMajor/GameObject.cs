@@ -24,6 +24,8 @@ public abstract class GameObject
     public bool YSort { get; set; }
     /// <summary>Soma ao Y só para ordenar, como o pé de um poste alto que fica acima da origem.</summary>
     public float SortOffset { get; set; }
+    /// <summary>Não recebe a iluminação: aparece sempre com a cor normal, como uma placa luminosa ou um efeito.</summary>
+    public bool Unlit { get; set; }
     public float X { get; set; }
     public float Y { get; set; }
     public float ScaleX { get; set; } = 1;

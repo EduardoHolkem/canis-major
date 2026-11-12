@@ -1,0 +1,12 @@
+{
+  "unlit": true,
+  "components": [
+    {
+      "type": "Light",
+      "color": "#FFA040",
+      "radius": 140,
+      "intensity": 1.4,
+      "flicker": 0.4
+    }
+  ]
+}

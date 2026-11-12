@@ -92,6 +92,7 @@
                                         <MenuItem Header="Novo objeto" Click="OnNewObject" />
                                         <MenuItem Header="Novo sprite" Click="OnNewSprite" />
                                         <MenuItem Header="Novo shader" Click="OnNewShader" />
+                                        <MenuItem Header="Novo shader de um preset" Click="OnNewShaderPreset" />
                                         <MenuItem Header="Novo tileset" Click="OnNewTileset" />
                                         <Separator />
                                         <MenuItem Header="Exportar jogo" Click="OnExportGame" />

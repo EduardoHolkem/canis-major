@@ -523,6 +523,7 @@ public partial class MainWindow
             room.PostShaders = typed.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
             WriteRoom();
         });
+        BuildLightingSection(room);
         var count = room.Instances.Count;
         AddNote(count == 0 ? "Nenhuma instância ainda. Escolha um objeto no pincel e clique na sala."
             : $"{count} {(count == 1 ? "instância" : "instâncias")}. Salve com Ctrl S; Ctrl Z desfaz.");
@@ -796,6 +797,7 @@ public partial class MainWindow
     private void OnNewObject(object? sender, RoutedEventArgs e) => _ = CreateResourceAsync("object");
     private void OnNewSprite(object? sender, RoutedEventArgs e) => _ = CreateResourceAsync("sprite");
     private void OnNewShader(object? sender, RoutedEventArgs e) => _ = CreateResourceAsync("shader");
+    private void OnNewShaderPreset(object? sender, RoutedEventArgs e) => ChooseShaderPreset();
     private void OnNewTileset(object? sender, RoutedEventArgs e) => _ = CreateResourceAsync("tileset");
 
     public async Task CreateResourceAsync(string kind)
@@ -991,6 +993,7 @@ public partial class MainWindow
         actions.Add(("Novo objeto", "objects/", () => _ = CreateResourceAsync("object")));
         actions.Add(("Novo sprite", "sprites/", () => _ = CreateResourceAsync("sprite")));
         actions.Add(("Novo shader", "shaders/", () => _ = CreateResourceAsync("shader")));
+        actions.Add(("Novo shader de um preset", "brilho, contorno, dissolver, CRT...", ChooseShaderPreset));
         actions.Add(("Novo tileset", "tilesets/", () => _ = CreateResourceAsync("tileset")));
         actions.Add(("Exportar jogo", "Pasta e .zip em export/", () => _ = ExportGameAsync()));
         actions.Add((IsGameView ? "Mostrar os arquivos" : "Mostrar os recursos do jogo", "Lista ao lado", () => SetGameView(!IsGameView)));

@@ -132,6 +132,8 @@ public static class ComponentTypes
         [nameof(Collider)] = typeof(Collider),
         [nameof(ShaderParams)] = typeof(ShaderParams),
         [nameof(Lifetime)] = typeof(Lifetime),
+        [nameof(Light)] = typeof(Light),
+        [nameof(ShadowCaster)] = typeof(ShadowCaster),
     };
 
     public static void Register(Type type)
@@ -189,6 +191,7 @@ public sealed class ObjectDef
     public float? Alpha { get; set; }
     public float? ScaleX { get; set; }
     public float? ScaleY { get; set; }
+    public bool? Unlit { get; set; }
     public List<JsonObject> Components { get; set; } = [];
 }
 

@@ -185,6 +185,25 @@ fn effect(uv: vec2<f32>, color: vec4<f32>) -> vec4<f32> {
 - Ajudas: `sample(uv)`, `time()`, `resolution()` e `param(0)` a `param(3)`, preenchidos por `Game.SetShaderParam("nome", 0, x, y, z, w)`. O uv `(0, 0)` é o canto de cima à esquerda.
 - **Num sprite:** `Shader = "nome"` no objeto.
 - **Na tela inteira:** coloque o nome em `post_shaders` na sala, ou use `Game.PostShaders`.
+- **Prontos:** **+ › Novo shader de um preset** cria um shader pronto para ajustar: Básico, Brilho pulsante, Contorno, Flash de dano, Dissolver, Ondas (água ou calor), Preto e branco, Pixelizar, Tela antiga (CRT), Vinheta e Aberração cromática. O comentário no topo diz o que cada `param(0)` faz, e o componente `ShaderParams` mexe nos números sem código.
+
+## Iluminação 2D
+
+A sala pode ficar no escuro e ser iluminada por luzes de verdade, com relevo e sombras, sem escrever shader nenhum.
+
+1. **Na sala**, no Inspetor, ligue **Iluminação** e escolha um **preset**: Dia, Entardecer, Noite, Caverna, Neon ou Terror. A cor ambiente e a intensidade (0 é escuro total, 1 é normal) também se mudam à mão.
+2. **Nos objetos**, ponha o componente **Light** na ficha (tocha, lanterna, janela, olhos brilhando): cor, raio, intensidade, queda (`falloff`), altura, deslocamento, tremor de fogo (`flicker`) e se projeta sombras.
+3. **Sombras:** o componente **ShadowCaster** faz o objeto bloquear a luz (pelo retângulo de colisão), e uma camada de tiles com **Fazer sombra** transforma os tiles sólidos em paredes de sombra.
+4. **Relevo:** ponha a normal map ao lado do sprite, como `sprites/pedra_n.png` para `sprites/pedra.png`. A engine carrega sozinha, e a luz passa a mostrar o volume (ferramentas como Laigter ou SpriteIlluminator geram normal maps a partir do sprite).
+
+- A interface desenhada com `screen: true` e os objetos com **Unlit** (na ficha ou no código) ficam fora da luz, sempre com a cor normal.
+- No código, `Lighting.Enabled`, `Lighting.Ambient`, `Lighting.AmbientIntensity` e `Lighting.Preset("noite")` mudam a luz durante o jogo, e `Get<Light>()` mexe em cada luz.
+- Desempenho: até 32 luzes (as mais perto da câmera) e 64 retângulos de sombra por quadro. Sem iluminação ligada, a engine não faz passe nenhum a mais.
+- O Exemplo tem a sala `noite` para ver tudo junto: rode com `--room noite`.
+
+```json
+"lighting": { "enabled": true, "ambient": "#3A4A7A", "intensity": 0.35 },
+```
 
 ## Como compilar e jogar
 

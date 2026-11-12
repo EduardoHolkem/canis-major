@@ -140,6 +140,7 @@ public partial class MainWindow
         };
         Inspector.Children.Add(palette);
 
+        AddCheck("Fazer sombra (tiles sólidos bloqueiam a luz)", layer.CastShadows, "l.f.shadows", on => EditLayer(room, layer.Name, l => l.CastShadows = on));
         var collision = new CheckBox { Content = "Mostrar os tiles sólidos em vermelho", IsChecked = RoomView.ShowCollision, FontSize = 12, Tag = "l.f.collision" };
         collision.IsCheckedChanged += (_, _) =>
         {

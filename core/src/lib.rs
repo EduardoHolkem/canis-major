@@ -6,6 +6,7 @@
 mod audio;
 mod gfx;
 mod keys;
+mod light;
 mod mesh;
 mod shader;
 mod text;
@@ -353,6 +354,31 @@ pub unsafe extern "C" fn cm_check_shader(source: *const u8, len: usize) -> i32 {
             1
         }
     }
+}
+
+/// Liga uma normal map (outra textura carregada) a um sprite, para o relevo da iluminação.
+#[no_mangle]
+pub extern "C" fn cm_set_normal_map(texture: u32, normal: u32) {
+    with_engine((), |e| e.gfx.set_normal_map(texture, normal))
+}
+
+/// A iluminação do quadro: ambiente (r, g, b, intensidade), as luzes e os retângulos de sombra.
+#[no_mangle]
+pub unsafe extern "C" fn cm_set_lighting(
+    on: u32, ambient: *const f32, softness: f32,
+    lights: *const light::LightData, light_count: usize,
+    occluders: *const f32, occluder_count: usize,
+) {
+    let ambient = if ambient.is_null() { [1.0, 1.0, 1.0, 1.0] } else { [*ambient, *ambient.add(1), *ambient.add(2), *ambient.add(3)] };
+    let lights = if lights.is_null() { &[][..] } else { std::slice::from_raw_parts(lights, light_count) };
+    let occ: Vec<[f32; 4]> = if occluders.is_null() {
+        Vec::new()
+    } else {
+        std::slice::from_raw_parts(occluders, occluder_count * 4).chunks_exact(4).map(|c| [c[0], c[1], c[2], c[3]]).collect()
+    };
+    // A intensidade multiplica a cor, e a luz ambiente vai pronta para o shader.
+    let amb = [ambient[0] * ambient[3], ambient[1] * ambient[3], ambient[2] * ambient[3], 1.0];
+    with_engine((), |e| e.gfx.set_lighting(on != 0, amb, softness, lights, &occ))
 }
 
 #[no_mangle]

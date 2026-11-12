@@ -16,6 +16,13 @@ internal struct DrawCmd
     public float L0, L1, L2, L3;
 }
 
+/// <summary>Uma luz para o núcleo. Precisa bater com light::LightData no Rust (48 bytes).</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct LightData
+{
+    public float X, Y, Radius, Intensity, R, G, B, Falloff, Height, Shadows, Pad0, Pad1;
+}
+
 /// <summary>Estado da entrada vindo do Rust. Bits: 1 segurando, 2 apertou, 4 soltou.</summary>
 [StructLayout(LayoutKind.Sequential)]
 internal unsafe struct InputState
@@ -42,6 +49,9 @@ internal static unsafe partial class Native
     [LibraryImport(Lib)] public static partial int cm_load_shader(byte* source, nuint len);
     [LibraryImport(Lib)] public static partial int cm_check_shader(byte* source, nuint len);
     [LibraryImport(Lib)] public static partial void cm_set_shader_param(uint shader, uint index, float x, float y, float z, float w);
+    [LibraryImport(Lib)] public static partial void cm_set_normal_map(uint texture, uint normal);
+    [LibraryImport(Lib)]
+    public static partial void cm_set_lighting(uint on, float* ambient, float softness, LightData* lights, nuint lightCount, float* occluders, nuint occluderCount);
     [LibraryImport(Lib)] public static partial uint cm_mesh_builtin(uint kind);
     [LibraryImport(Lib)] public static partial uint cm_load_mesh(byte* path, nuint len);
     [LibraryImport(Lib)]

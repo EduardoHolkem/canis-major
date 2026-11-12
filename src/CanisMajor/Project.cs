@@ -28,6 +28,8 @@ public sealed class RoomData
     public List<string> PostShaders { get; set; } = [];
     /// <summary>Camadas da sala, como no GameMaker. Vazia, a sala tem uma camada de instâncias só.</summary>
     public List<LayerData> Layers { get; set; } = [];
+    /// <summary>Iluminação 2D da sala. Null deixa a sala sem luz (tudo com a cor normal).</summary>
+    public LightingData? Lighting { get; set; }
     public List<JsonObject> Instances { get; set; } = [];
 }
 

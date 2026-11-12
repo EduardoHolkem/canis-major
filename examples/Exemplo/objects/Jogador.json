@@ -1,0 +1,10 @@
+{
+  "components": [
+    {
+      "type": "Light",
+      "color": "#CFE0FF",
+      "radius": 120,
+      "intensity": 1.2
+    }
+  ]
+}

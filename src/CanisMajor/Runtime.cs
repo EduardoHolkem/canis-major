@@ -84,6 +84,13 @@ internal static unsafe partial class Runtime
             Native.cm_texture_size(tex, &w, &h);
             var meta = GameProject.LoadSpriteMeta(png);
             info = new SpriteInfo(tex, (float)w / meta.Frames, h, meta.Frames, meta.Origin[0], meta.Origin[1], meta.Fps) { Mask = MaskOf(png, meta) };
+            // A normal map, se houver, fica ao lado: sprites/nome_n.png.
+            var normalPng = Path.Combine(Project.Folder("sprite"), name + "_n.png");
+            if (File.Exists(normalPng))
+            {
+                var normal = Native.WithUtf8(normalPng, (p, len) => Native.cm_load_texture((byte*)p, len));
+                if (normal != 0) Native.cm_set_normal_map(tex, normal);
+            }
         }
         Sprites[name] = info;
         return info;
@@ -179,6 +186,13 @@ internal static unsafe partial class Runtime
         RoomHeight = room.Height;
         Background = Color.Hex(room.Background);
         PostShaders = [.. room.PostShaders];
+        Lighting.Reset();
+        if (room.Lighting is { } lighting)
+        {
+            Lighting.Enabled = lighting.Enabled;
+            Lighting.Ambient = Color.Hex(lighting.Ambient);
+            Lighting.AmbientIntensity = lighting.Intensity;
+        }
         foreach (var s in PostShaders) Shader(s);
         CameraX = CameraY = 0;
         // Sem "layers" no arquivo, cada objeto fica na profundidade que ele mesmo define (salas antigas).
@@ -224,6 +238,7 @@ internal static unsafe partial class Runtime
                 DrawLayer(backgrounds[next++]);
             if (o.Visible && o.Alive)
             {
+                DrawFlags = o.Unlit ? 1u : 0u;
                 o.OnDraw();
                 o.DrawComponents();
             }
@@ -234,6 +249,7 @@ internal static unsafe partial class Runtime
 
     private static void DrawLayer(LayerData layer)
     {
+        DrawFlags = 0;
         if (layer.IsTiles) DrawTiles(layer);
         else DrawBackground(layer);
     }
@@ -332,6 +348,7 @@ internal static unsafe partial class Runtime
         if (def.Alpha is { } alpha) obj.Alpha = alpha;
         if (def.ScaleX is { } sx) obj.ScaleX = sx;
         if (def.ScaleY is { } sy) obj.ScaleY = sy;
+        if (def.Unlit is { } unlit) obj.Unlit = unlit;
         foreach (var json in def.Components)
             obj.Add(ComponentTypes.Create(json, $"objects/{obj.Kind}.json"));
     }
@@ -357,10 +374,18 @@ internal static unsafe partial class Runtime
         ref var c = ref _cmds[_cmdCount++];
         c = default;
         c.Kind = kind;
+        c.Flags = DrawFlags;
         return ref c;
     }
 
-    private static (float, float) Offset(float x, float y, bool screen) => screen ? (x + CameraX, y + CameraY) : (x, y);
+    // Bit 1: não recebe luz. Vale para o que é desenhado preso à tela (interface) e para objetos Unlit.
+    internal static uint DrawFlags;
+
+    private static (float, float) Offset(float x, float y, bool screen)
+    {
+        DrawFlags = screen ? 1u : 0u;
+        return screen ? (x + CameraX, y + CameraY) : (x, y);
+    }
 
     public static void Quad(uint tex, float x, float y, float w, float h, float ox, float oy, float rotDeg,
                             (float U0, float V0, float U1, float V1) uv, Color color, uint shader)
@@ -375,6 +400,7 @@ internal static unsafe partial class Runtime
     public static void DrawObject(GameObject o)
     {
         if (SpriteInfo(o.Sprite) is not { } s) return;
+        DrawFlags = o.Unlit ? 1u : 0u;
         Quad(s.Texture, o.X, o.Y, s.Width * o.ScaleX, s.Height * o.ScaleY, s.OriginX * o.ScaleX, s.OriginY * o.ScaleY,
              o.Rotation, s.Uv(o.Frame), o.Color.WithAlpha(o.Alpha), Shader(o.Shader));
     }
@@ -516,6 +542,7 @@ internal static unsafe partial class Runtime
             _cmdCount = 0;
             Strings.Clear();
             DrawWorld();
+            SubmitLighting();
 
             var post = PostShaders.Select(Shader).ToArray();
             (clear[0], clear[1], clear[2], clear[3]) = (Background.R, Background.G, Background.B, Background.A);

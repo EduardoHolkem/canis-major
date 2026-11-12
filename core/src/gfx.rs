@@ -7,6 +7,7 @@ use glam::{Mat4, Vec3};
 use winit::window::Window;
 
 use crate::mesh::{self, Vertex};
+use crate::light;
 use crate::shader;
 use crate::text::{TextAtlas, ATLAS};
 
@@ -141,6 +142,20 @@ pub struct Gfx {
     pub time: f32,
     pub viewport: (f32, f32, f32),
     last_output: usize,
+    // Iluminação 2D (light.rs).
+    light_on: bool,
+    light_ambient: [f32; 4],
+    light_softness: f32,
+    lights: Vec<light::LightData>,
+    occluders: Vec<[f32; 4]>,
+    light_buf: wgpu::Buffer,
+    light_bind: wgpu::BindGroup,
+    normal_pipeline: wgpu::RenderPipeline,
+    light_pipeline: wgpu::RenderPipeline,
+    normal_target: usize,
+    lit_target: usize,
+    flat_normal: usize,
+    normal_maps: std::collections::HashMap<usize, usize>,
 }
 
 fn err<E: std::fmt::Display>(what: &str) -> impl FnOnce(E) -> String + '_ {
@@ -319,6 +334,70 @@ impl Gfx {
         });
         let depth_view = depth.create_view(&Default::default());
 
+        // Iluminação: um passe das normais (com o vértice dos sprites) e um de luz em tela cheia.
+        let light_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("luz"),
+            bind_group_layouts: &[&globals_layout, &tex_layout, &tex_layout],
+            push_constant_ranges: &[],
+        });
+        let normal_module = device.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("normais"), source: wgpu::ShaderSource::Wgsl(light::NORMAL.into()) });
+        let normal_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("normais"),
+            layout: Some(&light_layout),
+            vertex: wgpu::VertexState {
+                module: &normal_module,
+                entry_point: Some("vs"),
+                compilation_options: Default::default(),
+                buffers: &[
+                    wgpu::VertexBufferLayout { array_stride: 8, step_mode: wgpu::VertexStepMode::Vertex, attributes: &wgpu::vertex_attr_array![0 => Float32x2] },
+                    wgpu::VertexBufferLayout {
+                        array_stride: std::mem::size_of::<Instance>() as u64,
+                        step_mode: wgpu::VertexStepMode::Instance,
+                        attributes: &wgpu::vertex_attr_array![1 => Float32x4, 2 => Float32x4, 3 => Float32x4, 4 => Float32x4],
+                    },
+                ],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &normal_module,
+                entry_point: Some("fs"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState { format: SCENE_FORMAT, blend: None, write_mask: wgpu::ColorWrites::ALL })],
+            }),
+            primitive: wgpu::PrimitiveState { topology: wgpu::PrimitiveTopology::TriangleStrip, ..Default::default() },
+            depth_stencil: None,
+            multisample: Default::default(),
+            multiview: None,
+            cache: None,
+        });
+        let light_module = device.create_shader_module(wgpu::ShaderModuleDescriptor { label: Some("luz"), source: wgpu::ShaderSource::Wgsl(light::LIGHT.into()) });
+        let light_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("luz"),
+            layout: Some(&light_layout),
+            vertex: wgpu::VertexState { module: &light_module, entry_point: Some("vs"), compilation_options: Default::default(), buffers: &[] },
+            fragment: Some(wgpu::FragmentState {
+                module: &light_module,
+                entry_point: Some("fs"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState { format: SCENE_FORMAT, blend: None, write_mask: wgpu::ColorWrites::ALL })],
+            }),
+            primitive: wgpu::PrimitiveState { topology: wgpu::PrimitiveTopology::TriangleStrip, ..Default::default() },
+            depth_stencil: None,
+            multisample: Default::default(),
+            multiview: None,
+            cache: None,
+        });
+        let light_buf = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("luz"),
+            size: std::mem::size_of::<light::LightUniform>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let light_bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("luz"),
+            layout: &globals_layout,
+            entries: &[wgpu::BindGroupEntry { binding: 0, resource: light_buf.as_entire_binding() }],
+        });
+
         let mut gfx = Gfx {
             surface, device, queue, config, width, height, pixel_art,
             tex_layout, globals_layout, mesh_u_layout, sprite_layout, sampler_main, sampler_linear,
@@ -327,11 +406,18 @@ impl Gfx {
             scene: 0, ping: [0, 0], depth_view, atlas: TextAtlas::new(), atlas_tex: 0,
             instances: Vec::new(), batches: Vec::new(), mesh_uniforms: Vec::new(),
             proj: Mat4::IDENTITY, time: 0.0, viewport: (0.0, 0.0, 1.0), last_output: 0,
+            light_on: false, light_ambient: [1.0, 1.0, 1.0, 1.0], light_softness: 0.0, lights: Vec::new(), occluders: Vec::new(),
+            light_buf, light_bind, normal_pipeline, light_pipeline,
+            normal_target: 0, lit_target: 0, flat_normal: 0, normal_maps: std::collections::HashMap::new(),
         };
         gfx.create_texture(1, 1, Some(&[255, 255, 255, 255]), false, false); // índice 0: branca
         gfx.scene = gfx.create_texture(width, height, None, true, false) - 1;
         gfx.ping = [gfx.create_texture(width, height, None, true, false) - 1, gfx.create_texture(width, height, None, true, false) - 1];
         gfx.atlas_tex = gfx.create_texture(ATLAS, ATLAS, None, false, true) - 1;
+        gfx.normal_target = gfx.create_texture(width, height, None, true, false) - 1;
+        gfx.lit_target = gfx.create_texture(width, height, None, true, false) - 1;
+        // A normal "para a frente", usada pelos sprites sem normal map.
+        gfx.flat_normal = gfx.create_texture(1, 1, Some(&[128, 128, 255, 255]), false, false) - 1;
         gfx.add_shader(shader::compose(shader::DEFAULT_EFFECT))?; // índice 0: padrão
         Ok(gfx)
     }
@@ -492,6 +578,27 @@ impl Gfx {
         Ok((self.shaders.len() - 1) as u32)
     }
 
+    /// Liga a normal map (outra textura) a um sprite. 0 desliga.
+    pub fn set_normal_map(&mut self, texture: u32, normal: u32) {
+        let tex = self.texture_index(texture);
+        if normal == 0 || texture == 0 {
+            self.normal_maps.remove(&tex);
+        } else {
+            self.normal_maps.insert(tex, self.texture_index(normal));
+        }
+    }
+
+    /// Luzes deste quadro em diante. Desligada, a cena sai como está, sem custo nenhum.
+    pub fn set_lighting(&mut self, on: bool, ambient: [f32; 4], softness: f32, lights: &[light::LightData], occluders: &[[f32; 4]]) {
+        self.light_on = on;
+        self.light_ambient = ambient;
+        self.light_softness = softness;
+        self.lights.clear();
+        self.lights.extend_from_slice(&lights[..lights.len().min(light::MAX_LIGHTS)]);
+        self.occluders.clear();
+        self.occluders.extend_from_slice(&occluders[..occluders.len().min(light::MAX_OCCLUDERS)]);
+    }
+
     pub fn set_param(&mut self, shader: u32, index: u32, value: [f32; 4]) {
         if let Some(s) = self.shaders.get_mut(shader as usize) {
             if (index as usize) < 4 {
@@ -593,7 +700,8 @@ impl Gfx {
                     let tex = self.texture_index(c.texture);
                     self.push_quad(tex, shader, Instance {
                         rect: [c.x, c.y, c.w, c.h],
-                        orot: [c.ox, c.oy, c.rot, 0.0],
+                        // O quarto valor marca o que não recebe luz (bit 1 de flags).
+                        orot: [c.ox, c.oy, c.rot, if c.flags & 1 != 0 { 1.0 } else { 0.0 }],
                         uv: [c.u0, c.v0, c.u1, c.v1],
                         color: [c.r, c.g, c.b, c.a],
                     });
@@ -716,6 +824,58 @@ impl Gfx {
         }
 
         let mut source = self.scene;
+        if self.light_on {
+            let uniform = light::LightUniform::build(
+                [cam.0, cam.1, self.width as f32, self.height as f32],
+                self.light_ambient, &self.lights, &self.occluders, self.light_softness);
+            self.queue.write_buffer(&self.light_buf, 0, bytemuck::bytes_of(&uniform));
+            // 1. As normais de cada sprite. O fundo é plano e recebe luz.
+            {
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("normais"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &self.textures[self.normal_target].view,
+                        resolve_target: None,
+                        ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color { r: 0.5, g: 0.5, b: 1.0, a: 1.0 }), store: wgpu::StoreOp::Store },
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                });
+                pass.set_pipeline(&self.normal_pipeline);
+                pass.set_bind_group(0, &self.shaders[0].globals_bind, &[]);
+                pass.set_vertex_buffer(0, self.quad.slice(..));
+                pass.set_vertex_buffer(1, self.inst_buf.slice(..));
+                for batch in &self.batches {
+                    if let Batch::Sprites { tex, start, count, .. } = *batch {
+                        let normal = self.normal_maps.get(&tex).copied().unwrap_or(self.flat_normal);
+                        pass.set_bind_group(1, &self.textures[tex].bind, &[]);
+                        pass.set_bind_group(2, &self.textures[normal].bind, &[]);
+                        pass.draw(0..4, start..start + count);
+                    }
+                }
+            }
+            // 2. A luz: cena vezes (ambiente + cada luz, com relevo e sombra).
+            {
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("luz"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &self.textures[self.lit_target].view,
+                        resolve_target: None,
+                        ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::BLACK), store: wgpu::StoreOp::Store },
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                });
+                pass.set_pipeline(&self.light_pipeline);
+                pass.set_bind_group(0, &self.light_bind, &[]);
+                pass.set_bind_group(1, &self.textures[self.scene].bind, &[]);
+                pass.set_bind_group(2, &self.textures[self.normal_target].bind, &[]);
+                pass.draw(0..4, 0..1);
+            }
+            source = self.lit_target;
+        }
         for (i, &shader) in post.iter().enumerate() {
             let Some(s) = self.shaders.get(shader as usize) else { continue };
             let target = self.ping[i % 2];

@@ -177,6 +177,7 @@ public sealed class RoomModel
         if (layer.Parallax != 0) json["parallax"] = layer.Parallax;
         if (layer.IsTiles)
         {
+            if (layer.CastShadows) json["cast_shadows"] = true;
             if (layer.Tileset is not null) json["tileset"] = layer.Tileset;
             json["columns"] = layer.Columns;
             // Linhas vazias no fim não vão para o arquivo.

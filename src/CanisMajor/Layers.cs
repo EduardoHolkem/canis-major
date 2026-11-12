@@ -19,6 +19,8 @@ public sealed class LayerData
     public string? Sprite { get; set; }
     public bool TileX { get; set; }
     public bool TileY { get; set; }
+    /// <summary>Tiles: os tiles sólidos fazem sombra.</summary>
+    public bool CastShadows { get; set; }
     /// <summary>Fundo: quanto a camada acompanha a câmera (0 = presa ao mundo, 1 = presa à tela). Dá o efeito de paralaxe.</summary>
     public float Parallax { get; set; }
 
