@@ -158,6 +158,15 @@ public partial class MainWindow
             ("para cada", "Faz algo com cada objeto de um tipo", () => new ForEachBlock { Var = "e", Collection = "Game.Instances<Estrela>()" }),
             ("sair do evento", "Para o evento aqui", () => new ReturnBlock()),
         ]),
+        ("Eventos e tempo", "#C0577A",
+        [
+            ("ligar alarme", "Daqui a tantos segundos, o evento \"Quando um alarme toca\" roda com o número do alarme", () => new CallBlock { Method = "SetAlarm", Args = ["0", "1f"] }),
+            ("se for o alarme", "Dentro do evento do alarme: separa o que cada alarme faz", () => new IfBlock { Condition = "index == 0" }),
+            ("se for a tecla", "Dentro dos eventos de tecla: separa cada tecla", () => new IfBlock { Condition = "key == \"space\"" }),
+            ("se encostou em", "Dentro do evento de colisão: filtra o tipo do outro", () => new IfBlock { Condition = "other is Estrela", Then = [new CallBlock { Method = "other.Destroy" }] }),
+            ("se for o botão", "Dentro do evento de clique: 1 esquerdo, 2 meio, 3 direito", () => new IfBlock { Condition = "button == 1" }),
+            ("texto na tela", "Use no evento \"Ao desenhar a interface\": vida, placar, menus", () => new CallBlock { Method = "Draw.Text", Args = ["\"Vida: 3\"", "8", "8", "size: 10"] }),
+        ]),
         ("Variáveis", "#C65A3A",
         [
             ("nova variável", "Guarda um valor para usar depois", () => new VarBlock { Name = "valor", Value = "0" }),

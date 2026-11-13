@@ -58,6 +58,77 @@ public abstract class GameObject
     /// <summary>Quando o objeto é destruído.</summary>
     public virtual void OnDestroy() { }
 
+    // ---------- mais eventos, na ordem do quadro ----------
+    // Begin Step, alarmes, teclado e mouse, Step, colisões, End Step, Draw e Draw GUI.
+
+    /// <summary>No começo do quadro, antes de todos os OnStep.</summary>
+    public virtual void OnBeginStep(float dt) { }
+
+    /// <summary>No fim do quadro, depois dos OnStep e das colisões. Bom para acertar a posição final.</summary>
+    public virtual void OnEndStep(float dt) { }
+
+    /// <summary>Quando um alarme chega a zero. Ligue com <see cref="SetAlarm"/>.</summary>
+    public virtual void OnAlarm(int index) { }
+
+    /// <summary>
+    /// A cada quadro em que este objeto encosta em outro (pelos retângulos de colisão). Filtre o tipo
+    /// no código: <c>if (other is Estrela e) e.Destroy();</c>
+    /// </summary>
+    public virtual void OnCollision(GameObject other) { }
+
+    /// <summary>Quando uma tecla é apertada, com o nome dela ("left", "space", "a").</summary>
+    public virtual void OnKeyPressed(string key) { }
+
+    /// <summary>Quando uma tecla é solta.</summary>
+    public virtual void OnKeyReleased(string key) { }
+
+    /// <summary>Quando um botão do mouse é apertado em cima deste objeto (1 esquerdo, 2 meio, 3 direito).</summary>
+    public virtual void OnClick(int button) { }
+
+    /// <summary>Quando o mouse entra no retângulo deste objeto.</summary>
+    public virtual void OnMouseEnter() { }
+
+    /// <summary>Quando o mouse sai do retângulo deste objeto.</summary>
+    public virtual void OnMouseLeave() { }
+
+    /// <summary>
+    /// Desenho da interface, depois de tudo e preso à tela: vida, placar, menus. Aqui o <c>Draw</c> já
+    /// usa a tela (0, 0 é o canto da janela do jogo), e nada recebe a iluminação.
+    /// </summary>
+    public virtual void OnDrawGui() { }
+
+    // ---------- alarmes ----------
+
+    private readonly float[] _alarms = Enumerable.Repeat(-1f, AlarmCount).ToArray();
+
+    /// <summary>Quantos alarmes cada objeto tem (0 a 11), como no GameMaker.</summary>
+    public const int AlarmCount = 12;
+
+    /// <summary>Liga o alarme: daqui a tantos segundos, <see cref="OnAlarm"/> roda com o índice. Negativo desliga.</summary>
+    public void SetAlarm(int index, float seconds)
+    {
+        if (index < 0 || index >= AlarmCount) throw new ArgumentOutOfRangeException(nameof(index), $"Os alarmes vão de 0 a {AlarmCount - 1}.");
+        _alarms[index] = seconds;
+    }
+
+    /// <summary>Quanto falta para o alarme tocar, em segundos, ou -1 se está desligado.</summary>
+    public float GetAlarm(int index) => index is >= 0 and < AlarmCount ? _alarms[index] : -1;
+
+    internal void TickAlarms(float dt)
+    {
+        for (var i = 0; i < AlarmCount && Alive; i++)
+        {
+            if (_alarms[i] < 0) continue;
+            _alarms[i] -= dt;
+            if (_alarms[i] > 0) continue;
+            _alarms[i] = -1;
+            OnAlarm(i);
+        }
+    }
+
+    // O mouse estava em cima no quadro anterior (para OnMouseEnter e OnMouseLeave).
+    internal bool MouseInside;
+
     // ---------- componentes ----------
 
     private readonly List<Component> _components = [];

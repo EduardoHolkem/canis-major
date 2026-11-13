@@ -72,6 +72,18 @@ public sealed class BlockView : ScrollViewer
         e.Pointer.Capture(this);
     }
 
+    // Acrescenta o evento (se ainda não existe) e aponta o lugar dos blocos novos para o começo dele.
+    public void AddEventByName(string name)
+    {
+        if (_script is null)
+            return;
+        var ev = _script.Find(name) ?? AddEvent(name);
+        InsertList = ev.Body;
+        InsertIndex = 0;
+        Selected = null;
+        Commit();
+    }
+
     private EventScript AddEvent(string name)
     {
         var ev = new EventScript { Name = name };
@@ -110,22 +122,27 @@ public sealed class BlockView : ScrollViewer
         if (message is not null)
             _root.Children.Add(new TextBlock { Text = message, Foreground = palette.Muted, TextWrapping = TextWrapping.Wrap });
 
+        // Os eventos que ainda não existem ficam numa lista só, para não encher a tela de botões.
+        var missing = ObjectScript.KnownEvents.Where(k => _script.Find(k.Name) is null).ToList();
+        if (missing.Count > 0)
+        {
+            var titles = missing.Select(m => m.Title).ToList();
+            var add = new ComboBox { ItemsSource = titles, PlaceholderText = "+ Evento", FontSize = 12, MinWidth = 220, HorizontalAlignment = HorizontalAlignment.Left, Tag = "ev.add" };
+            ToolTip.SetTip(add, "Acrescenta um evento ao objeto: alarme, colisão, teclado, mouse, interface...");
+            add.SelectionChanged += (_, _) =>
+            {
+                if (add.SelectedIndex < 0)
+                    return;
+                AddEventByName(missing[add.SelectedIndex].Name);
+            };
+            _root.Children.Add(add);
+        }
+
         foreach (var (name, title, _) in ObjectScript.KnownEvents)
         {
             var ev = _script.Find(name);
             if (ev is null)
-            {
-                var add = new Button { Classes = { "secondary" }, Content = $"+ {title}", FontSize = 12, HorizontalAlignment = HorizontalAlignment.Left, Tag = "ev.add." + name };
-                add.Click += (_, _) =>
-                {
-                    var created = AddEvent(name);
-                    InsertList = created.Body;
-                    InsertIndex = 0;
-                    Commit();
-                };
-                _root.Children.Add(add);
                 continue;
-            }
             var section = new StackPanel { Spacing = 0 };
             var header = new Border
             {

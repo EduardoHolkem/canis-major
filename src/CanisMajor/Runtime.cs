@@ -384,6 +384,8 @@ internal static unsafe partial class Runtime
 
     private static (float, float) Offset(float x, float y, bool screen)
     {
+        // No Draw GUI, tudo é preso à tela.
+        screen |= InGui;
         DrawFlags = screen ? 1u : 0u;
         return screen ? (x + CameraX, y + CameraY) : (x, y);
     }
@@ -529,11 +531,7 @@ internal static unsafe partial class Runtime
             Time = (float)now;
             if (Dt > 0) Fps = Fps <= 0 ? 1 / Dt : Fps * 0.9f + 0.1f / Dt;
 
-            foreach (var o in Instances.ToArray())
-            {
-                if (o.Alive) o.OnStep(Dt);
-                if (o.Alive) o.StepComponents(Dt);
-            }
+            StepFrame(Dt);
             Instances.RemoveAll(o => !o.Alive);
 
             foreach (var o in Instances)
@@ -543,6 +541,7 @@ internal static unsafe partial class Runtime
             _cmdCount = 0;
             Strings.Clear();
             DrawWorld();
+            DrawGui();
             SubmitLighting();
 
             var post = PostShaders.Select(Shader).ToArray();

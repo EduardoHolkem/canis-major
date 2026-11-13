@@ -117,8 +117,18 @@ public sealed class ObjectScript
     public static readonly (string Name, string Title, string Signature)[] KnownEvents =
     [
         ("OnCreate", "Ao criar", "public override void OnCreate()"),
+        ("OnBeginStep", "No começo do quadro", "public override void OnBeginStep(float dt)"),
         ("OnStep", "A cada quadro", "public override void OnStep(float dt)"),
+        ("OnEndStep", "No fim do quadro", "public override void OnEndStep(float dt)"),
+        ("OnAlarm", "Quando um alarme toca (index)", "public override void OnAlarm(int index)"),
+        ("OnCollision", "Ao encostar em outro (other)", "public override void OnCollision(GameObject other)"),
+        ("OnKeyPressed", "Ao apertar uma tecla (key)", "public override void OnKeyPressed(string key)"),
+        ("OnKeyReleased", "Ao soltar uma tecla (key)", "public override void OnKeyReleased(string key)"),
+        ("OnClick", "Ao clicar neste objeto (button)", "public override void OnClick(int button)"),
+        ("OnMouseEnter", "Quando o mouse entra", "public override void OnMouseEnter()"),
+        ("OnMouseLeave", "Quando o mouse sai", "public override void OnMouseLeave()"),
         ("OnDraw", "Ao desenhar", "public override void OnDraw()"),
+        ("OnDrawGui", "Ao desenhar a interface (tela)", "public override void OnDrawGui()"),
         ("OnDestroy", "Ao destruir", "public override void OnDestroy()"),
     ];
 

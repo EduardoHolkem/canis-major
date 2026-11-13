@@ -102,6 +102,35 @@ public class Jogador : GameObject
 
 Cores aceitam texto: `Color = "#9DB8E0"`.
 
+## Eventos
+
+Além de `OnCreate`, `OnStep`, `OnDraw` e `OnDestroy`, o objeto pode escrever os eventos abaixo. Eles rodam a cada quadro nesta ordem, como no GameMaker.
+
+| Ordem | Evento | Quando |
+|---|---|---|
+| 1 | `OnBeginStep(dt)` | No começo do quadro, antes de todos os `OnStep` |
+| 2 | `OnAlarm(index)` | Quando um alarme chega a zero. `SetAlarm(0, 1.5f)` liga o alarme 0 para daqui a 1,5 segundo (são 12, de 0 a 11), `GetAlarm(0)` diz quanto falta |
+| 3 | `OnKeyPressed(key)` e `OnKeyReleased(key)` | Ao apertar e soltar uma tecla, com o nome dela (`"space"`, `"left"`, `"a"`) |
+| 3 | `OnClick(button)`, `OnMouseEnter()` e `OnMouseLeave()` | Clique em cima do objeto (1 esquerdo, 2 meio, 3 direito) e mouse entrando ou saindo do retângulo dele |
+| 4 | `OnStep(dt)` | A cada quadro (depois dele rodam os componentes) |
+| 5 | `OnCollision(other)` | A cada quadro em que encosta em outro objeto. Filtre o tipo: `if (other is Estrela e) e.Destroy();` |
+| 6 | `OnEndStep(dt)` | No fim do quadro, bom para acertar a posição final |
+| 7 | `OnDraw()` | Desenho no mundo |
+| 8 | `OnDrawGui()` | Desenho da interface, depois de tudo, preso à tela e fora da luz. O `Draw` já usa a tela (0, 0 é o canto) |
+
+Os eventos de colisão, teclado, mouse e interface só rodam nos objetos que os escrevem, então não custam nada para os outros. No modo **C# Blocos**, todos aparecem em **+ Evento**, e a paleta tem a categoria **Eventos e tempo** (ligar alarme, se for o alarme, se for a tecla, se encostou em, se for o botão e texto na tela).
+
+```csharp
+public class Bomba : GameObject
+{
+    public override void OnCreate() => SetAlarm(0, 3);           // explode em 3 segundos
+    public override void OnAlarm(int index) => Destroy();
+    public override void OnClick(int button) => SetAlarm(0, 0.2f); // clicou, explode já
+    public override void OnCollision(GameObject other) { if (other is Jogador) Game.Restart(); }
+    public override void OnDrawGui() => Draw.Text($"Bomba: {GetAlarm(0):0.0}s", 8, 8, size: 10);
+}
+```
+
 ## Objetos e componentes
 
 Cada objeto tem uma **ficha** (`objects/Nome.json`), editada no Inspetor: sprite, shader, profundidade, visível, ordenar por Y, cor, alpha, escala e **componentes**. O script C# (`objects/Nome.cs`) é opcional e continua sendo o lugar do código. A ficha é aplicada depois do construtor, então o que estiver nela vale mais.

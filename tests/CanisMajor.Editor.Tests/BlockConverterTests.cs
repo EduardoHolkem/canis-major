@@ -167,6 +167,20 @@ public sealed class BlockConverterTests
     }
 
     [Fact]
+    public void NewGameMakerEventsWriteTheRightSignature()
+    {
+        var script = BlockConverter.Parse(Jogador)!;
+        script.Events.Add(new EventScript { Name = "OnCollision", Body = [new IfBlock { Condition = "other is Estrela", Then = [new CallBlock { Method = "other.Destroy" }] }] });
+        script.Events.Add(new EventScript { Name = "OnAlarm", Body = [new CallBlock { Method = "SetAlarm", Args = ["0", "1f"] }] });
+        var code = BlockConverter.Generate(Jogador, script);
+        Assert.Empty(BlockConverter.SyntaxErrors(code));
+        Assert.Contains("public override void OnCollision(GameObject other)", code);
+        Assert.Contains("public override void OnAlarm(int index)", code);
+        var again = BlockConverter.Parse(code)!;
+        Assert.IsType<IfBlock>(Assert.Single(again.Find("OnCollision")!.Body));
+    }
+
+    [Fact]
     public void NoClassMeansNoBlocks()
     {
         Assert.Null(BlockConverter.Parse("// vazio"));
