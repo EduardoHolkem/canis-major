@@ -54,6 +54,7 @@ $env:DOTNET_ROOT="$env:LOCALAPPDATA\Microsoft\dotnet"; $env:NUGET_PACKAGES="D:\N
 | `8a1d4ef` | C# Código e C# Blocos, conversíveis (etapa 8) |
 | `22b3b3c` | Versão 0.4.0. O zip está em `dist` e a Release está em rascunho no GitHub |
 | `43ced84` | Eventos do GameMaker: alarmes, colisão, teclado, mouse, Begin e End Step e Draw GUI |
+| `022738b` | Objetos pais, código da sala, modelos de recurso (janela Criar recurso) e Editor de Objetos (eventos, variáveis, persistente) |
 
 ## Próximos passos
 
