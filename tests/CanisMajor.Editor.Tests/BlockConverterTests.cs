@@ -181,6 +181,33 @@ public sealed class BlockConverterTests
     }
 
     [Fact]
+    public void RoomScriptHasRoomEvents()
+    {
+        const string code = """
+            using CanisMajor;
+
+            [Room("fase-1")]
+            public class SalaFase1 : RoomScript
+            {
+                public override void OnCreate()
+                {
+                    Lighting.Preset("noite");
+                }
+            }
+            """;
+        var script = BlockConverter.Parse(code)!;
+        Assert.True(script.IsRoom);
+        Assert.Contains(script.Known, k => k.Name == "OnEnd");
+        Assert.DoesNotContain(script.Known, k => k.Name == "OnCollision");
+        Assert.IsType<CallBlock>(Assert.Single(script.Find("OnCreate")!.Body));
+        script.Events.Add(new EventScript { Name = "OnEnd", Body = [new CallBlock { Method = "Game.StopSounds" }] });
+        var back = BlockConverter.Generate(code, script);
+        Assert.Empty(BlockConverter.SyntaxErrors(back));
+        Assert.Contains("public override void OnEnd()", back);
+        Assert.False(BlockConverter.Parse(Jogador)!.IsRoom);
+    }
+
+    [Fact]
     public void NoClassMeansNoBlocks()
     {
         Assert.Null(BlockConverter.Parse("// vazio"));

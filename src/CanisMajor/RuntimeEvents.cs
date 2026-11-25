@@ -94,6 +94,8 @@ internal static partial class Runtime
 
         foreach (var o in Instances.ToArray())
             if (o.Alive) o.OnEndStep(dt);
+
+        RoomCode?.OnStep(dt);
     }
 
     /// <summary>O Draw GUI: na ordem das camadas, depois do mundo, preso à tela.</summary>
@@ -105,6 +107,7 @@ internal static partial class Runtime
         {
             foreach (var o in Instances.Where(o => o.Alive && o.Visible && (HooksOf(o) & Hooks.Gui) != 0).OrderBy(o => o.Layer).ToArray())
                 o.OnDrawGui();
+            RoomCode?.OnDrawGui();
         }
         finally
         {

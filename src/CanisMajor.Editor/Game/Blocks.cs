@@ -132,5 +132,20 @@ public sealed class ObjectScript
         ("OnDestroy", "Ao destruir", "public override void OnDestroy()"),
     ];
 
+    // Os eventos do código da sala (rooms/nome.cs, uma classe filha de RoomScript).
+    public static readonly (string Name, string Title, string Signature)[] RoomEvents =
+    [
+        ("OnCreate", "Quando a sala abre", "public override void OnCreate()"),
+        ("OnStep", "A cada quadro", "public override void OnStep(float dt)"),
+        ("OnDrawGui", "Ao desenhar a interface (tela)", "public override void OnDrawGui()"),
+        ("OnEnd", "Ao sair da sala", "public override void OnEnd()"),
+    ];
+
+    // Se é o código de uma sala.
+    public bool IsRoom { get; set; }
+
+    // Os eventos que valem para este script.
+    public (string Name, string Title, string Signature)[] Known => IsRoom ? RoomEvents : KnownEvents;
+
     public EventScript? Find(string name) => Events.FirstOrDefault(e => e.Name == name);
 }

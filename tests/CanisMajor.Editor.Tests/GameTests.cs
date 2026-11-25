@@ -295,7 +295,7 @@ public class GameTests
         var root = NewGame(temp);
         var window = Open(settings, root);
 
-        var creating = window.CreateResourceAsync("object");
+        var creating = window.CreateFromTemplateAsync(ResourceTemplates.Find("object", "vazio"));
         Dispatcher.UIThread.RunJobs();
         TypeInDialog(window, "Inimigo");
         await creating;

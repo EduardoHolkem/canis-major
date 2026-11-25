@@ -182,6 +182,8 @@ public static class ComponentTypes
 /// </summary>
 public sealed class ObjectDef
 {
+    /// <summary>O objeto pai, como no GameMaker: o filho herda a ficha, os eventos e entra nas colisões e buscas pelo nome do pai.</summary>
+    public string? Parent { get; set; }
     public string? Sprite { get; set; }
     public string? Shader { get; set; }
     public int? Layer { get; set; }
@@ -193,7 +195,53 @@ public sealed class ObjectDef
     public float? ScaleX { get; set; }
     public float? ScaleY { get; set; }
     public bool? Unlit { get; set; }
+    /// <summary>Persistente: continua vivo ao trocar de sala, como no GameMaker.</summary>
+    public bool? Persistent { get; set; }
     public List<JsonObject> Components { get; set; } = [];
+    /// <summary>
+    /// As variáveis definidas no Editor de Objetos (Variable Definitions do GameMaker). Cada instância
+    /// da sala pode trocar o valor. Vão para o campo de mesmo nome do script ou, sem campo, para Vars.
+    /// </summary>
+    public List<VariableDef> Variables { get; set; } = [];
+}
+
+/// <summary>Uma variável definida na ficha: nome, tipo e valor inicial.</summary>
+public sealed class VariableDef
+{
+    public string Name { get; set; } = "";
+    /// <summary>"number" (float), "integer" (int), "text" (string) ou "bool".</summary>
+    public string Type { get; set; } = "number";
+    public JsonNode? Value { get; set; }
+
+    public static readonly string[] Types = ["number", "integer", "text", "bool"];
+
+    /// <summary>O tipo C# de cada tipo de variável.</summary>
+    public static Type ClrType(string type) => type switch
+    {
+        "integer" => typeof(int),
+        "text" => typeof(string),
+        "bool" => typeof(bool),
+        _ => typeof(float),
+    };
+
+    /// <summary>O valor convertido para o tipo, ou o padrão do tipo quando não serve.</summary>
+    public static object? Convert(JsonNode? value, string type)
+    {
+        try
+        {
+            return type switch
+            {
+                "integer" => value?.Deserialize<int>() ?? 0,
+                "text" => value is JsonValue v && v.TryGetValue<string>(out var s) ? s : value?.ToJsonString() ?? "",
+                "bool" => value?.Deserialize<bool>() ?? false,
+                _ => value?.Deserialize<float>() ?? 0f,
+            };
+        }
+        catch (Exception e) when (e is JsonException or InvalidOperationException or FormatException)
+        {
+            return type switch { "integer" => 0, "text" => "", "bool" => false, _ => (object)0f };
+        }
+    }
 }
 
 /// <summary>Objeto que só tem a ficha, sem classe C#.</summary>

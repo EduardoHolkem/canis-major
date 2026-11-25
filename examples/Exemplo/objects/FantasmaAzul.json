@@ -1,0 +1,13 @@
+{
+  "parent": "Fantasma",
+  "color": "#80A0FF",
+  "components": [
+    {
+      "type": "Light",
+      "color": "#5080FF",
+      "radius": 56,
+      "intensity": 0.9,
+      "cast_shadows": false
+    }
+  ]
+}

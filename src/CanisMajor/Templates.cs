@@ -90,7 +90,7 @@ public static class Templates
 
               <ItemGroup>
                 <ProjectReference Include="$(CanisMajorRoot)\src\CanisMajor\CanisMajor.csproj" />
-                <Content Include="projeto.json;sprites\**;rooms\**;shaders\**;sounds\**;objects\*.json;tilesets\**" CopyToOutputDirectory="PreserveNewest" />
+                <Content Include="projeto.json;sprites\**;rooms\*.json;shaders\**;sounds\**;objects\*.json;tilesets\**" CopyToOutputDirectory="PreserveNewest" />
               </ItemGroup>
 
             </Project>

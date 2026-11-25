@@ -44,6 +44,42 @@ public abstract class GameObject
     /// <summary>Nome do tipo (o nome da classe), usado pelas salas e por <see cref="Collide(string, float, float)"/>.</summary>
     public string Kind { get; internal set; } = "";
 
+    // O tipo e todos os pais, do mais perto ao mais longe: Morcego, Inimigo... Vem da ficha ("parent") e da classe C#.
+    internal string[] Lineage = [];
+
+    /// <summary>O objeto pai (o "parent" da ficha ou a classe base), ou null.</summary>
+    public string? Parent => Lineage.Length > 1 ? Lineage[1] : null;
+
+    /// <summary>
+    /// É deste tipo ou descende dele? Um Morcego filho de Inimigo responde sim a Is("Inimigo").
+    /// É o que faz Collide, Move(solid:) e Game.Instances acharem os filhos pelo nome do pai.
+    /// </summary>
+    /// <summary>Continua vivo ao trocar de sala (o OnCreate não roda de novo), como no GameMaker.</summary>
+    public bool Persistent { get; set; }
+
+    /// <summary>
+    /// As variáveis definidas no Editor de Objetos que não têm um campo de mesmo nome no script, e as
+    /// propriedades a mais das instâncias da sala. Leia com <see cref="Var{T}"/>: <c>Var&lt;float&gt;("vida")</c>.
+    /// </summary>
+    public Dictionary<string, object?> Vars { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>O valor de uma variável de <see cref="Vars"/>, ou <paramref name="fallback"/> se ela não existir.</summary>
+    public T Var<T>(string name, T fallback = default!)
+    {
+        if (!Vars.TryGetValue(name, out var value) || value is null) return fallback;
+        if (value is T typed) return typed;
+        try { return (T)System.Convert.ChangeType(value, typeof(T), System.Globalization.CultureInfo.InvariantCulture); }
+        catch (Exception e) when (e is InvalidCastException or FormatException or OverflowException) { return fallback; }
+    }
+
+    public bool Is(string kind)
+    {
+        if (string.Equals(Kind, kind, StringComparison.OrdinalIgnoreCase)) return true;
+        foreach (var name in Lineage)
+            if (string.Equals(name, kind, StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
+
     // ---------- eventos ----------
 
     /// <summary>Uma vez, quando o objeto entra na sala.</summary>

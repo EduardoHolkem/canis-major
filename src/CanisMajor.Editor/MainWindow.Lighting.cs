@@ -70,43 +70,6 @@ public partial class MainWindow
         BuildInspector();
     }
 
-    // Novo shader a partir de um preset: a lista aparece na barra de comando.
-    public void ChooseShaderPreset()
-    {
-        if (!_isGame)
-            return;
-        var items = ShaderPresets.All
-            .Select(p => (p.Title, $"para {p.Use}", (Action)(() => _ = CreateShaderFromPresetAsync(p))))
-            .ToList();
-        OpenPalette();
-        _paletteOverride = items;
-        RefreshPalette();
-    }
-
-    private async Task CreateShaderFromPresetAsync(ShaderPresets.Preset preset)
-    {
-        if (RootFolder is not { } root)
-            return;
-        var suggestion = preset.Name;
-        for (var n = 2; GameFiles.CheckName(root, "shader", suggestion) is not null && n < 100; n++)
-            suggestion = preset.Name + n;
-        var name = await AskTextAsync($"Novo shader: {preset.Title}", $"Bom para {preset.Use}. Num objeto, escolha o shader na ficha; na tela inteira, ponha o nome em \"Shaders de tela\" da sala.", "Criar",
-            text => GameFiles.CheckName(root, "shader", text.Trim()), suggestion);
-        if (name is null || RootFolder != root)
-            return;
-        var path = Path.Combine(GameFiles.FolderOf(root, "shader"), name.Trim() + ".wgsl");
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            File.WriteAllText(path, preset.Source.Replace("\r\n", "\n"));
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            ShowStatus($"Não foi possível criar: {e.Message}");
-            return;
-        }
-        _gameView = true;
-        RefreshTree();
-        OpenFile(path);
-    }
+    // Novo shader a partir de um preset: os presets são modelos na janela de modelos.
+    public void ChooseShaderPreset() => ShowTemplatePicker("shader");
 }

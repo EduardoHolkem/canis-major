@@ -490,7 +490,28 @@ public partial class MainWindow
                 };
                 AddRow("Camada", layerPicker);
             }
-            foreach (var (key, value) in instance.Extra.Where(p => p.Key != "layer").ToList())
+            // As variáveis definidas no Editor de Objetos: vazio usa o valor do objeto.
+            var defined = DefinedVariables(instance.Object);
+            if (defined.Count > 0)
+            {
+                AddHeading("Variáveis");
+                foreach (var (varName, type, fallback, _) in defined)
+                {
+                    var key = instance.Extra.Select(p => p.Key).FirstOrDefault(k => string.Equals(k, varName, StringComparison.OrdinalIgnoreCase));
+                    var current = key is null ? "" : ValueText(instance.Extra[key]);
+                    AddTextField($"{varName} ({ValueText(fallback)})", current, "i.var." + varName, typed =>
+                    {
+                        if (key is not null)
+                            instance.Extra.Remove(key);
+                        if (!string.IsNullOrWhiteSpace(typed))
+                            instance.Extra[varName] = ParseVariableValue(typed, type);
+                        WriteRoom();
+                        BuildInspector();
+                    });
+                }
+                AddNote("Vazio usa o valor do objeto, entre parênteses.");
+            }
+            foreach (var (key, value) in instance.Extra.Where(p => p.Key != "layer" && !defined.Any(d => string.Equals(d.Name, p.Key, StringComparison.OrdinalIgnoreCase))).ToList())
             {
                 var text = value?.ToJsonString() ?? "null";
                 AddTextField(key, text, "i.extra." + key, typed =>
@@ -799,51 +820,7 @@ public partial class MainWindow
 
     // Criar recursos e jogos
 
-    private void OnNewRoom(object? sender, RoutedEventArgs e) => _ = CreateResourceAsync("room");
-    private void OnNewObject(object? sender, RoutedEventArgs e) => _ = CreateResourceAsync("object");
-    private void OnNewSprite(object? sender, RoutedEventArgs e) => _ = CreateResourceAsync("sprite");
-    private void OnNewShader(object? sender, RoutedEventArgs e) => _ = CreateResourceAsync("shader");
-    private void OnNewShaderPreset(object? sender, RoutedEventArgs e) => ChooseShaderPreset();
-    private void OnNewTileset(object? sender, RoutedEventArgs e) => _ = CreateResourceAsync("tileset");
-    private void OnNewAiObject(object? sender, RoutedEventArgs e) => ChooseAiPreset();
-
-    public async Task CreateResourceAsync(string kind)
-    {
-        if (!_isGame || RootFolder is not { } root)
-            return;
-        var (title, body, stem) = kind switch
-        {
-            "room" => ("Nova sala", "O nome do arquivo em rooms/. No jogo, Game.Goto(\"nome\") leva até ela.", "sala"),
-            "object" => ("Novo objeto", "O nome vira a classe em objects/, e as salas usam esse nome para colocar o objeto.", "Objeto"),
-            "sprite" => ("Novo sprite", "Um PNG de 16 por 16 em sprites/, pronto para desenhar no seu editor de imagens.", "sprite"),
-            "shader" => ("Novo shader", "Um arquivo WGSL em shaders/. Num objeto, Shader = \"nome\" aplica no sprite dele.", "efeito"),
-            "tileset" => ("Novo tileset", "Uma imagem de sprites/ cortada em tiles, para pintar salas. Escolha a imagem e o tamanho do tile no Inspetor.", "tiles"),
-            _ => throw new ArgumentException(kind),
-        };
-        var suggestion = stem;
-        for (var n = 2; GameFiles.CheckName(root, kind, suggestion) is not null && n < 100; n++)
-            suggestion = stem + n;
-
-        var name = await AskTextAsync(title, body, "Criar", text => GameFiles.CheckName(root, kind, text.Trim()), suggestion);
-        if (name is null || RootFolder != root)
-            return;
-        string path;
-        try
-        {
-            path = GameFiles.Create(root, kind, name.Trim());
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            ShowStatus($"Não foi possível criar: {e.Message}");
-            return;
-        }
-        _gameView = true;
-        _closedGameSections.Remove(GameFiles.FolderOf(root, kind));
-        UpdateTreeHeader();
-        RefreshTree();
-        ReindexProject();
-        OpenFile(path);
-    }
+    // Criar recursos fica em MainWindow.Templates.cs (a janela de modelos).
 
     private void OnNewGame(object? sender, RoutedEventArgs e) => _ = NewGameAsync();
 
@@ -989,7 +966,7 @@ public partial class MainWindow
         actions.Add(("Novo jogo", "Canis Major", () => _ = NewGameAsync()));
         if (!_isGame)
             return;
-        actions.Add(("Nova sala", "rooms/", () => _ = CreateResourceAsync("room")));
+        actions.Add(("Nova sala", "modelos: vazia, camadas, noite, menu, cronômetro...", () => ShowTemplatePicker("room")));
         if (IsRoomDocument && ActiveDocument is { } roomDoc)
         {
             var roomName = Path.GetFileNameWithoutExtension(roomDoc.FullPath);
@@ -997,12 +974,11 @@ public partial class MainWindow
             actions.Add(("Tornar sala inicial", roomName, () => SetStartRoom(roomName)));
             actions.Add(("Duplicar sala", roomName, () => _ = DuplicateRoomAsync(roomDoc.FullPath)));
         }
-        actions.Add(("Novo objeto", "objects/", () => _ = CreateResourceAsync("object")));
-        actions.Add(("Novo sprite", "sprites/", () => _ = CreateResourceAsync("sprite")));
-        actions.Add(("Novo shader", "shaders/", () => _ = CreateResourceAsync("shader")));
-        actions.Add(("Novo shader de um preset", "brilho, contorno, dissolver, CRT...", ChooseShaderPreset));
-        actions.Add(("Novo tileset", "tilesets/", () => _ = CreateResourceAsync("tileset")));
-        actions.Add(("Novo objeto com IA", "guarda, perseguidor, medroso, ajudante...", ChooseAiPreset));
+        actions.Add(("Novo objeto", "modelos: jogador, coletável, projétil, botão, porta, IA...", () => ShowTemplatePicker("object")));
+        actions.Add(("Novo sprite", "modelos: personagem, bola, moeda, parede, botão...", () => ShowTemplatePicker("sprite")));
+        actions.Add(("Novo shader", "modelos: brilho, contorno, dissolver, CRT...", () => ShowTemplatePicker("shader")));
+        actions.Add(("Novo script", "modelos: matemática, salvar, cronômetro...", () => ShowTemplatePicker("script")));
+        actions.Add(("Novo tileset", "tilesets/", () => ShowTemplatePicker("tileset")));
         actions.Add(("Exportar jogo", "Pasta e .zip em export/", () => _ = ExportGameAsync()));
         actions.Add((IsGameView ? "Mostrar os arquivos" : "Mostrar os recursos do jogo", "Lista ao lado", () => SetGameView(!IsGameView)));
         if (IsRoomDocument)

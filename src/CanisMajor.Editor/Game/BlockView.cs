@@ -88,7 +88,7 @@ public sealed class BlockView : ScrollViewer
     {
         var ev = new EventScript { Name = name };
         // Na ordem dos eventos conhecidos, para o código ficar arrumado.
-        var order = ObjectScript.KnownEvents.Select(k => k.Name).ToList();
+        var order = _script!.Known.Select(k => k.Name).ToList();
         var at = _script!.Events.FindIndex(e => order.IndexOf(e.Name) > order.IndexOf(name));
         _script.Events.Insert(at < 0 ? _script.Events.Count : at, ev);
         return ev;
@@ -123,7 +123,7 @@ public sealed class BlockView : ScrollViewer
             _root.Children.Add(new TextBlock { Text = message, Foreground = palette.Muted, TextWrapping = TextWrapping.Wrap });
 
         // Os eventos que ainda não existem ficam numa lista só, para não encher a tela de botões.
-        var missing = ObjectScript.KnownEvents.Where(k => _script.Find(k.Name) is null).ToList();
+        var missing = _script.Known.Where(k => _script.Find(k.Name) is null).ToList();
         if (missing.Count > 0)
         {
             var titles = missing.Select(m => m.Title).ToList();
@@ -138,7 +138,7 @@ public sealed class BlockView : ScrollViewer
             _root.Children.Add(add);
         }
 
-        foreach (var (name, title, _) in ObjectScript.KnownEvents)
+        foreach (var (name, title, _) in _script.Known)
         {
             var ev = _script.Find(name);
             if (ev is null)

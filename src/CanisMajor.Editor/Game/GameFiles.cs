@@ -10,8 +10,9 @@ public sealed record GameSection(string Kind, string Folder, string Title, strin
 
 public sealed record GameResource(string Kind, string Name, string Path);
 
-// O que o editor descobre de um objeto lendo o .cs, sem compilar: a classe, o sprite e a camada.
-public sealed record GameObjectInfo(string Class, string? Sprite, int Layer, string Path);
+// O que o editor descobre de um objeto lendo o .cs, sem compilar: a classe, o sprite, a camada e o
+// pai (o "parent" da ficha ou a classe base). Script diz se há uma classe C# para este objeto.
+public sealed record GameObjectInfo(string Class, string? Sprite, int Layer, string Path, string? Parent = null, bool Script = false);
 
 // Os arquivos de um projeto de jogo: listar, reconhecer e criar recursos.
 public static partial class GameFiles
@@ -20,13 +21,15 @@ public static partial class GameFiles
     [
         new("room", "rooms", "Salas", "sala", [".json"]),
         new("object", "objects", "Objetos", "objeto", [".cs", ".json"]),
+        new("script", "scripts", "Scripts", "script", [".cs"]),
         new("sprite", "sprites", "Sprites", "sprite", [".png"]),
         new("shader", "shaders", "Shaders", "shader", [".wgsl"]),
         new("tileset", "tilesets", "Tilesets", "tileset", [".json"]),
         new("sound", "sounds", "Sons", "som", [".wav", ".ogg"]),
     ];
 
-    [GeneratedRegex(@"\bclass\s+(?<name>[A-Za-z_]\w*)\s*(?:\([^)]*\))?\s*:\s*(?:CanisMajor\.)?GameObject\b")]
+    // Toda classe com uma base. Depois ficam só as que chegam em GameObject, direto ou por um pai.
+    [GeneratedRegex(@"(?<abstract>\babstract\s+(?:\w+\s+)*)?\bclass\s+(?<name>[A-Za-z_]\w*)\s*(?:\([^)]*\))?\s*:\s*(?:CanisMajor\.)?(?<base>[A-Za-z_]\w*)\b")]
     private static partial Regex ClassPattern();
 
     [GeneratedRegex(@"\bSprite\s*=\s*""(?<sprite>[^""]+)""")]
@@ -102,8 +105,10 @@ public static partial class GameFiles
     // Lê os objetos do jogo. Uma classe sem Sprite = "..." usa o sprite com o mesmo nome, se houver.
     public static Dictionary<string, GameObjectInfo> Objects(string root)
     {
-        var objects = new Dictionary<string, GameObjectInfo>(StringComparer.OrdinalIgnoreCase);
         var sprites = List(root, "sprite").Select(s => s.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var found = new Dictionary<string, Found>(StringComparer.OrdinalIgnoreCase);
+        var bases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var abstracts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in List(root, "object"))
         {
             string text;
@@ -121,13 +126,31 @@ public static partial class GameFiles
                 // O que vem depois desta classe, até a próxima, é dela.
                 var next = ClassPattern().Match(text, match.Index + match.Length);
                 var body = text[match.Index..(next.Success ? next.Index : text.Length)];
-                var sprite = SpritePattern().Match(body) is { Success: true } s ? s.Groups["sprite"].Value
-                    : sprites.Contains(name) ? name
-                    : null;
-                var layer = LayerPattern().Match(body) is { Success: true } l && int.TryParse(l.Groups["layer"].Value, out var n) ? n : 0;
-                objects[name] = new GameObjectInfo(name, sprite, layer, file.Path);
+                var sprite = SpritePattern().Match(body) is { Success: true } s ? s.Groups["sprite"].Value : null;
+                int? layer = LayerPattern().Match(body) is { Success: true } l && int.TryParse(l.Groups["layer"].Value, out var n) ? n : null;
+                bases[name] = match.Groups["base"].Value;
+                if (match.Groups["abstract"].Success)
+                    abstracts.Add(name);
+                found[name] = new Found(sprite, layer, null, file.Path, true);
             }
         }
+        // Só as classes que chegam em GameObject, direto ou por um pai que chega.
+        var objectClasses = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var grew = true; grew;)
+        {
+            grew = false;
+            foreach (var (name, baseName) in bases)
+                if (!objectClasses.Contains(name) && (baseName == "GameObject" || objectClasses.Contains(baseName)))
+                    grew = objectClasses.Add(name) || grew;
+        }
+        foreach (var name in found.Keys.ToList())
+        {
+            if (!objectClasses.Contains(name))
+                found.Remove(name);
+            else if (bases[name] != "GameObject")
+                found[name] = found[name] with { Parent = bases[name] };
+        }
+
         // A ficha (Nome.json) vale mais que o construtor, e um objeto só com ficha também existe.
         var folder = FolderOf(root, "object");
         if (Directory.Exists(folder))
@@ -146,12 +169,32 @@ public static partial class GameFiles
                 }
                 if (def is null)
                     continue;
-                objects.TryGetValue(name, out var known);
-                objects[name] = new GameObjectInfo(name, def.Sprite ?? known?.Sprite ?? (sprites.Contains(name) ? name : null), def.Layer ?? known?.Layer ?? 0, known?.Path ?? path);
+                found.TryGetValue(name, out var known);
+                found[name] = new Found(def.Sprite ?? known?.Sprite, def.Layer ?? known?.Layer,
+                    string.IsNullOrWhiteSpace(def.Parent) ? known?.Parent : def.Parent.Trim(), known?.Path ?? path, known?.Script ?? false);
             }
+        }
+
+        // O sprite e a camada que faltam vêm do pai (do mais perto ao mais longe).
+        var objects = new Dictionary<string, GameObjectInfo>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, item) in found)
+        {
+            if (abstracts.Contains(name))
+                continue; // classe abstrata só serve de pai: não dá para pôr na sala
+            string? sprite = item.Sprite ?? (sprites.Contains(name) ? name : null);
+            var layer = item.Layer;
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { name };
+            for (var parent = item.Parent; parent is not null && seen.Add(parent) && found.TryGetValue(parent, out var p); parent = p.Parent)
+            {
+                sprite ??= p.Sprite ?? (sprites.Contains(parent) ? parent : null);
+                layer ??= p.Layer;
+            }
+            objects[name] = new GameObjectInfo(name, sprite, layer ?? 0, item.Path, item.Parent, item.Script);
         }
         return objects;
     }
+
+    private sealed record Found(string? Sprite, int? Layer, string? Parent, string Path, bool Script);
 
     // O namespace dos objetos que já existem, ou um feito do nome do jogo.
     public static string Namespace(string root)
@@ -175,12 +218,13 @@ public static partial class GameFiles
     {
         if (string.IsNullOrWhiteSpace(name))
             return "Escreva um nome.";
-        if (kind == "object")
+        if (kind is "object" or "script")
         {
             if (!IsIdentifier(name))
-                return "O nome de um objeto vira o nome da classe: comece com letra e use só letras, números e _.";
-            if (Objects(root).ContainsKey(name))
-                return "Já existe um objeto com esse nome.";
+                return $"O nome de um {Section(kind).Singular} vira o nome da classe: comece com letra e use só letras, números e _.";
+            // Objetos e scripts são classes do mesmo jogo: dois com o mesmo nome não compilam.
+            if (Objects(root).ContainsKey(name) || File.Exists(Path.Combine(FolderOf(root, "script"), name + ".cs")))
+                return "Já existe um objeto ou script com esse nome.";
         }
         else if (!name.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-'))
         {
@@ -191,6 +235,11 @@ public static partial class GameFiles
             return $"Já existe um {section.Singular} com esse nome.";
         return null;
     }
+
+    // Um nome de classe C# feito do nome da sala: "fase-1" vira SalaFase1. O "Sala" na frente evita
+    // trombar com um objeto de mesmo nome; quem liga a classe à sala é o atributo [Room].
+    public static string RoomClassName(string room) =>
+        "Sala" + string.Concat(Regex.Split(room, @"[^\p{L}\p{Nd}]+").Where(w => w.Length > 0).Select(w => char.ToUpperInvariant(w[0]) + w[1..]));
 
     private static bool IsIdentifier(string name) =>
         name.Length > 0 && (char.IsAsciiLetter(name[0]) || name[0] == '_') && name.All(c => char.IsAsciiLetterOrDigit(c) || c == '_');

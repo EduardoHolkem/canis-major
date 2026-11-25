@@ -80,17 +80,22 @@ public partial class MainWindow
     {
         var name = ActiveObjectName;
         var def = LoadDef(name);
+        ReloadGameObjects(); // a ficha pode abrir antes de qualquer sala ter lido os objetos (e o pai dá o sprite)
         BuildObjectSummary(name, def);
 
         AddHeading($"Objeto {name}", first: true);
+        AddParentChoice(name, def);
+        // Num filho, deixar vazio quer dizer "o do pai".
+        var none = _gameObjects.GetValueOrDefault(name)?.Parent is not null ? "(o do pai)" : "(nenhum)";
         var sprites = SpriteNames();
-        sprites.Insert(0, "(nenhum)");
-        AddChoice("Sprite", sprites, Str(def, "sprite") ?? "(nenhum)", "o.sprite", chosen => EditDef(d => Set(d, "sprite", chosen == "(nenhum)" ? null : chosen)));
+        sprites.Insert(0, none);
+        AddChoice("Sprite", sprites, Str(def, "sprite") ?? none, "o.sprite", chosen => EditDef(d => Set(d, "sprite", chosen == none ? null : chosen)));
         var shaders = GameFiles.List(RootFolder!, "shader").Select(s => s.Name).ToList();
-        shaders.Insert(0, "(nenhum)");
-        AddChoice("Shader", shaders, Str(def, "shader") ?? "(nenhum)", "o.shader", chosen => EditDef(d => Set(d, "shader", chosen == "(nenhum)" ? null : chosen)));
+        shaders.Insert(0, none);
+        AddChoice("Shader", shaders, Str(def, "shader") ?? none, "o.shader", chosen => EditDef(d => Set(d, "shader", chosen == none ? null : chosen)));
         AddNumberField("Profundidade", Num(def, "layer") ?? 0, "o.layer", value => EditDef(d => d["layer"] = (int)value));
         AddCheck("Visível", Bool(def, "visible") ?? true, "o.visible", on => EditDef(d => Set(d, "visible", on ? null : false)));
+        AddCheck("Persistente (passa de sala em sala)", Bool(def, "persistent") ?? false, "o.persistent", on => EditDef(d => Set(d, "persistent", on ? true : null)));
         AddCheck("Ordenar por Y", Bool(def, "y_sort") ?? false, "o.ysort", on => EditDef(d => Set(d, "y_sort", on ? true : null)));
         AddNumberField("SortOffset", Num(def, "sort_offset") ?? 0, "o.sortoffset", value => EditDef(d => Set(d, "sort_offset", value == 0 ? null : value)));
         AddTextField("Cor", Str(def, "color") ?? "", "o.color", typed => EditDef(d => Set(d, "color", typed.Trim().Length == 0 ? null : typed.Trim())));
@@ -229,21 +234,25 @@ public partial class MainWindow
     private void CreateScript(string name, string path)
     {
         var ns = GameFiles.Namespace(RootFolder!);
+        var parent = Str(LoadDef(name), "parent");
+        var baseClass = ScriptBaseFor(parent);
+        // Filho de um objeto com script: herda a classe dele e chama os eventos do pai (o event_inherited do GameMaker).
+        var inherited = baseClass != "GameObject";
         File.WriteAllText(path, $$"""
             using CanisMajor;
 
             namespace {{ns}};
 
             // O script do objeto {{name}}. Sprite, shader e componentes ficam na ficha ({{name}}.json), pelo Inspetor.
-            public class {{name}} : GameObject
+            public class {{name}} : {{baseClass}}
             {
                 public override void OnCreate()
                 {
-                }
+            {{(inherited ? "        base.OnCreate(); // o que o pai faz\n" : "")}}    }
 
                 public override void OnStep(float dt)
                 {
-                }
+            {{(inherited ? "        base.OnStep(dt);\n" : "")}}    }
             }
 
             """);
@@ -275,6 +284,8 @@ public partial class MainWindow
             ObjectSummary.Children.Add(new TextBlock { Text = "Sem sprite. Escolha um no Inspetor.", Foreground = palette.Muted, FontSize = 12 });
         }
 
+        if ((Str(def, "parent") ?? (_gameObjects.TryGetValue(name, out var known) ? known.Parent : null)) is { } parent)
+            ObjectSummary.Children.Add(new TextBlock { Text = $"Filho de {parent}", FontSize = 13, FontWeight = FontWeight.SemiBold, Tag = "o.summary.parent" });
         var components = (def["components"] as JsonArray ?? []).OfType<JsonObject>().Select(c => Str(c, "type") ?? "?").ToList();
         ObjectSummary.Children.Add(new TextBlock
         {
@@ -290,6 +301,9 @@ public partial class MainWindow
             Foreground = palette.Muted,
             TextWrapping = TextWrapping.Wrap,
         });
+        // O Editor de Objetos: eventos e variáveis, como no GameMaker 2.
+        BuildEventsPanel(name);
+        BuildVariablesPanel(name, def);
     }
 
     // Campos e leitura da ficha

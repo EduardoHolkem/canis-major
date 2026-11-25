@@ -88,13 +88,12 @@
                                 <Path Stroke="{DynamicResource Muted}" StrokeThickness="1.3" Data="M5 0V10M0 5H10" />
                                 <Button.Flyout>
                                     <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                        <MenuItem Header="Nova sala" Click="OnNewRoom" />
-                                        <MenuItem Header="Novo objeto" Click="OnNewObject" />
-                                        <MenuItem Header="Novo sprite" Click="OnNewSprite" />
-                                        <MenuItem Header="Novo shader" Click="OnNewShader" />
-                                        <MenuItem Header="Novo shader de um preset" Click="OnNewShaderPreset" />
-                                        <MenuItem Header="Novo objeto com IA" Click="OnNewAiObject" />
-                                        <MenuItem Header="Novo tileset" Click="OnNewTileset" />
+                                        <MenuItem Header="Nova sala…" Click="OnNewRoom" />
+                                        <MenuItem Header="Novo objeto…" Click="OnNewObject" />
+                                        <MenuItem Header="Novo sprite…" Click="OnNewSprite" />
+                                        <MenuItem Header="Novo shader…" Click="OnNewShader" />
+                                        <MenuItem Header="Novo script…" Click="OnNewScript" />
+                                        <MenuItem Header="Novo tileset…" Click="OnNewTileset" />
                                         <Separator />
                                         <MenuItem Header="Exportar jogo" Click="OnExportGame" />
                                     </MenuFlyout>
@@ -478,7 +477,7 @@
                                     <!-- C# Blocos: o script do objeto em blocos de encaixar. -->
                                     <g:BlockView x:Name="BlockEditor" IsVisible="False" AutomationProperties.Name="Blocos" />
                                     <ScrollViewer x:Name="ObjectView" IsVisible="False" HorizontalScrollBarVisibility="Disabled">
-                                        <StackPanel x:Name="ObjectSummary" Margin="32,24" Spacing="10" MaxWidth="560" HorizontalAlignment="Left" />
+                                        <StackPanel x:Name="ObjectSummary" Margin="32,24" Spacing="8" MaxWidth="760" HorizontalAlignment="Left" />
                                     </ScrollViewer>
                                     <TextBlock x:Name="GameMessage" IsVisible="False" Margin="32,0" MaxWidth="520" TextWrapping="Wrap" TextAlignment="Center"
                                                Foreground="{DynamicResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -998,6 +997,27 @@
 
                         <TextBlock Grid.Row="2" Text="Cada escolha vale na hora e fica guardada para a próxima vez." FontSize="11" Foreground="{DynamicResource Muted}" Margin="0,10,0,0" />
                     </Grid>
+                </Grid>
+            </Border>
+        </Panel>
+
+        <!-- Modelos de recurso, como o "Create Asset" do GameMaker: o tipo à esquerda, os modelos à direita. -->
+        <Panel x:Name="TemplateOverlay" IsVisible="False" Focusable="True" KeyDown="OnTemplateKeyDown">
+            <Border Background="{DynamicResource Veil}" PointerPressed="OnTemplateVeil" />
+            <Border Width="860" MaxHeight="600" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="16"
+                    Padding="18" CornerRadius="14" Background="{DynamicResource Pop}">
+                <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="150,*">
+                    <StackPanel Grid.ColumnSpan="2" Spacing="2" Margin="0,0,0,14">
+                        <TextBlock Text="Criar recurso" FontSize="15" FontWeight="SemiBold" />
+                        <TextBlock Text="Escolha o tipo e um modelo pronto. Depois é só dar o nome." Foreground="{DynamicResource Muted}" />
+                    </StackPanel>
+                    <StackPanel x:Name="TemplateKinds" Grid.Row="1" Spacing="4" Margin="0,0,14,0" />
+                    <ScrollViewer Grid.Row="1" Grid.Column="1" HorizontalScrollBarVisibility="Disabled">
+                        <WrapPanel x:Name="TemplateCards" Orientation="Horizontal" />
+                    </ScrollViewer>
+                    <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+                        <Button Classes="secondary" Content="Cancelar" Click="OnTemplateCancel" />
+                    </StackPanel>
                 </Grid>
             </Border>
         </Panel>

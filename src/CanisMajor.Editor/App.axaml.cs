@@ -50,6 +50,8 @@ public partial class App : Application
                 window.OpenFile(file);
             if (options.Blocks)
                 window.ToggleBlocks();
+            if (options.Templates is { } kind)
+                window.ShowTemplatePicker(kind);
             await Task.Delay(TimeSpan.FromSeconds(options.Wait));
             window.SaveShot(options.Shot!);
             File.Delete(settingsPath);
@@ -58,12 +60,13 @@ public partial class App : Application
         return window;
     }
 
-    private sealed record StartOptions(string? Start, string? Shot, string? Open, string? Theme, double Wait, bool Blocks = false)
+    private sealed record StartOptions(string? Start, string? Shot, string? Open, string? Theme, double Wait, bool Blocks = false, string? Templates = null)
     {
         public static StartOptions Parse(string[] args)
         {
             string? start = null, shot = null, open = null, theme = null;
             var blocks = false;
+            string? templates = null;
             var wait = 1.5;
             for (var i = 0; i < args.Length; i++)
             {
@@ -81,6 +84,9 @@ public partial class App : Application
                     case "--blocks":
                         blocks = true;
                         break;
+                    case "--templates" when i + 1 < args.Length:
+                        templates = args[++i];
+                        break;
                     case "--wait" when i + 1 < args.Length:
                         wait = double.Parse(args[++i], System.Globalization.CultureInfo.InvariantCulture);
                         break;
@@ -89,7 +95,7 @@ public partial class App : Application
                         break;
                 }
             }
-            return new StartOptions(start, shot, open, theme, wait, blocks);
+            return new StartOptions(start, shot, open, theme, wait, blocks, templates);
         }
     }
 

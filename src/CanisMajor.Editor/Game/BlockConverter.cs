@@ -18,8 +18,8 @@ public static class BlockConverter
         var cls = root.DescendantNodes().OfType<ClassDeclarationSyntax>().FirstOrDefault();
         if (cls is null)
             return null;
-        var script = new ObjectScript { ClassName = cls.Identifier.Text };
-        foreach (var (name, _, _) in ObjectScript.KnownEvents)
+        var script = new ObjectScript { ClassName = cls.Identifier.Text, IsRoom = IsRoomScript(cls) };
+        foreach (var (name, _, _) in script.Known)
         {
             if (FindEvent(cls, name) is not { } method)
                 continue;
@@ -30,6 +30,10 @@ public static class BlockConverter
         }
         return script;
     }
+
+    // O código de uma sala (class Fase1 : RoomScript) tem os eventos da sala, não os do objeto.
+    private static bool IsRoomScript(ClassDeclarationSyntax cls) =>
+        cls.BaseList?.Types.Any(t => t.Type.ToString() is "RoomScript" or "CanisMajor.RoomScript") == true;
 
     // Se o texto tem erros de C# que impedem ler os blocos com segurança.
     public static IReadOnlyList<string> SyntaxErrors(string code) =>
@@ -78,7 +82,7 @@ public static class BlockConverter
             var sb = new StringBuilder();
             foreach (var ev in missing)
             {
-                var signature = ObjectScript.KnownEvents.First(k => k.Name == ev.Name).Signature;
+                var signature = script.Known.First(k => k.Name == ev.Name).Signature;
                 sb.Append(newline).Append(memberIndent).Append(signature).Append(newline)
                   .Append(memberIndent).Append(BodyText(ev.Body, memberIndent, newline)).Append(newline);
             }
@@ -110,6 +114,84 @@ public static class BlockConverter
     }
 
     // ---------- C# para blocos ----------
+
+    // ---------- para o Editor de Objetos ----------
+
+    // Acrescenta um evento (vazio ou com os blocos dados) no lugar certo da classe.
+    public static string AddEvent(string original, string name, List<Block>? body = null)
+    {
+        var script = Parse(original) ?? throw new InvalidOperationException("O script não tem uma classe.");
+        if (script.Find(name) is not null)
+            return original;
+        script.Events.Add(new EventScript { Name = name, Body = body ?? [] });
+        return Generate(original, script);
+    }
+
+    // Tira o método do evento, com os comentários e a linha em branco de antes.
+    public static string RemoveEvent(string original, string name)
+    {
+        var root = CSharpSyntaxTree.ParseText(original).GetCompilationUnitRoot();
+        var cls = root.DescendantNodes().OfType<ClassDeclarationSyntax>().FirstOrDefault();
+        if (cls is null || FindEvent(cls, name) is not { } method)
+            return original;
+        // O FullSpan leva junto o recuo, os comentários e a linha em branco de antes, e a quebra de linha do fim.
+        var result = original[..method.FullSpan.Start] + original[method.FullSpan.End..];
+        // Se era o primeiro membro, não deixa uma linha em branco logo depois da chave da classe.
+        var brace = cls.OpenBraceToken.Span.End;
+        if (method == cls.Members.First())
+        {
+            var rest = result[brace..];
+            var trimmed = rest.TrimStart(' ', '\t');
+            if (trimmed.StartsWith("\r\n\r\n") || trimmed.StartsWith("\n\n"))
+                result = result[..brace] + rest[(rest.Length - trimmed.Length + (trimmed.StartsWith("\r\n") ? 2 : 1))..];
+        }
+        return result;
+    }
+
+    // A linha (de 1 em diante) onde o corpo do evento começa, para o editor levar o cursor até ela.
+    public static int? EventLine(string code, string name)
+    {
+        var tree = CSharpSyntaxTree.ParseText(code);
+        var cls = tree.GetCompilationUnitRoot().DescendantNodes().OfType<ClassDeclarationSyntax>().FirstOrDefault();
+        if (cls is null || FindEvent(cls, name) is not { } method)
+            return null;
+        var at = method.Body?.OpenBraceToken.Span.End ?? method.SpanStart;
+        return tree.GetLineSpan(new Microsoft.CodeAnalysis.Text.TextSpan(at, 0)).StartLinePosition.Line + 2;
+    }
+
+    // Os nomes dos campos e propriedades da classe (para não criar uma variável repetida).
+    public static HashSet<string> MemberNames(string code)
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var cls = CSharpSyntaxTree.ParseText(code).GetCompilationUnitRoot().DescendantNodes().OfType<ClassDeclarationSyntax>().FirstOrDefault();
+        if (cls is null)
+            return names;
+        foreach (var member in cls.Members)
+        {
+            if (member is FieldDeclarationSyntax field)
+                foreach (var v in field.Declaration.Variables)
+                    names.Add(v.Identifier.Text);
+            else if (member is PropertyDeclarationSyntax prop)
+                names.Add(prop.Identifier.Text);
+        }
+        return names;
+    }
+
+    // Põe uma declaração (como "public float vida = 3f;") logo no começo da classe.
+    public static string AddMember(string original, string declaration, string? comment = null)
+    {
+        var root = CSharpSyntaxTree.ParseText(original).GetCompilationUnitRoot();
+        var cls = root.DescendantNodes().OfType<ClassDeclarationSyntax>().FirstOrDefault()
+            ?? throw new InvalidOperationException("O script não tem uma classe.");
+        var newline = original.Contains("\r\n") ? "\r\n" : "\n";
+        var indent = MemberIndent(cls, original);
+        var at = cls.OpenBraceToken.Span.End;
+        var text = newline + (comment is null ? "" : indent + "// " + comment + newline) + indent + declaration;
+        // Uma linha em branco separando dos outros membros.
+        if (cls.Members.Count > 0)
+            text += newline;
+        return original[..at] + text + original[at..];
+    }
 
     private static MethodDeclarationSyntax? FindEvent(ClassDeclarationSyntax cls, string name) =>
         cls.Members.OfType<MethodDeclarationSyntax>().FirstOrDefault(m => m.Identifier.Text == name);

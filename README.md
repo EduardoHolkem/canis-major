@@ -47,7 +47,8 @@ Seu jogo (C#)  ──►  CanisMajor.dll (C#)  ──P/Invoke──►  canis_co
 
 O editor nasceu do código da IDE [Sirius](https://github.com/erickfuzer/Sirius) e mantém tudo o que ela faz: abas, busca, terminal, Git, servidor de linguagem para C#, a cápsula do Executar. Num projeto de jogo, ele ganha:
 
-- **Recursos do jogo na lista ao lado:** salas, objetos, sprites, shaders e sons, com o **+** para criar cada um. O botão **Arquivos** mostra a pasta como ela é.
+- **Recursos do jogo na lista ao lado:** salas, objetos, scripts, sprites, shaders, tilesets e sons, com o **+** para criar cada um. O botão **Arquivos** mostra a pasta como ela é.
+- **Modelos prontos** (como o Create Asset do GameMaker): o **+** abre a janela **Criar recurso**, com o tipo à esquerda e os modelos à direita, cada um com prévia e explicação. Escolha o modelo, dê o nome e os arquivos nascem prontos (veja [Modelos de recurso](#modelos-de-recurso)).
 - **Editor de salas:** a sala desenhada com os sprites de verdade. Escolha um objeto no pincel e clique para colocar, arraste para pintar vários, arraste uma instância para mover, use o botão direito para apagar. A grade prende as posições, e o Alt solta. A roda aproxima, e o espaço com o arrasto move a vista. O botão **Código** mostra o JSON, e Ctrl Z desfaz pelos dois lados.
 - **Inspetor:** à direita, os dados da instância escolhida (objeto, X, Y e propriedades a mais, como `speed: 2`) e os da sala (tamanho, grade, fundo, shaders de tela).
 - **Sprites:** editor de pixels completo, com lápis, borracha, balde, conta-gotas, quadros, animação, origem e máscara de colisão (detalhes em "O editor de sprites").
@@ -56,6 +57,19 @@ O editor nasceu do código da IDE [Sirius](https://github.com/erickfuzer/Sirius)
 - **Novo jogo:** a partir do exemplo ou vazio, numa pasta à sua escolha.
 
 Para abrir, rode `Editor.cmd` (compila na primeira vez).
+
+### Modelos de recurso
+
+| Tipo | Modelos |
+|---|---|
+| Sala | Vazia, Com fundo e camadas, Sala grande, Noite com luz, Tela de menu (com o código da sala), Fase com cronômetro |
+| Objeto | Com script, Só ficha, Parede sólida, Jogador de plataforma, Jogador visto de cima, Coletável, Projétil, Botão de menu, Placar na tela, Porta para outra sala, Gerador e os seis papéis de IA (guarda, perseguidor, sentinela, medroso, ajudante, andarilho) |
+| Sprite | Vazios, como no GameMaker: Pequeno (16 por 16), Médio (32 por 32), Grande (64 por 64) e Personalizado (pergunta a largura e a altura, como 16x24) |
+| Shader | Vazio e os 11 presets (brilho, contorno, dissolver, CRT...) |
+| Script (em lista) | Funções do jogo, Matemática do jogo, Salvar e carregar, Cronômetro, Suavizar movimento |
+| Tileset | De um sprite, Parede e chão prontos (já cria a imagem e marca os tiles sólidos) |
+
+Os **scripts** (`scripts/Nome.cs`) são como os do GameMaker: funções que qualquer objeto chama, como `Mat.Chance(30)` ou `Save.Salvar()`. São classes C# compiladas junto com o jogo. Os objetos dos modelos usam um sprite de mesmo nome, se ele já existir, e os campos públicos (como `Destino` da porta) mudam por instância na sala. Há um teste que cria todos os modelos num jogo só e compila o jogo de verdade.
 
 ## Um objeto do jogo
 
@@ -159,6 +173,56 @@ Os seus componentes são classes que herdam de `Component`, com `Owner` (o objet
 }
 ```
 
+### Editor de Objetos
+
+Como o Object Editor do GameMaker 2, dá para montar um objeto sem escrever a classe na mão. Abra o objeto e clique em **Objeto** no alto:
+
+- **Propriedades**, no Inspetor: objeto pai, sprite, shader, profundidade, visível, **persistente** (continua vivo ao trocar de sala, sem rodar o `OnCreate` de novo), ordenar por Y, cor, escala e componentes.
+- **Eventos**: a lista dos eventos do objeto, com **+ Adicionar evento** (os 14 eventos). O editor cria o script, se ainda não houver, e escreve o método. Cada evento tem **Código** (abre o script com o cursor dentro dele), **Blocos** (abre em C# Blocos) e **✕** (tira o método). Os eventos do pai aparecem como **herdados**, e **Mudar aqui** escreve o evento no filho já chamando o do pai (`base.OnStep(dt)`).
+- **Variáveis** (as Variable Definitions do GameMaker): nome, tipo (número, inteiro, texto, sim ou não) e valor. Cada instância da sala mostra essas variáveis no Inspetor, e um campo vazio usa o valor do objeto. No jogo, o valor vai para o campo de mesmo nome do script (o botão **Criar campo** escreve `public float vida = 3f;` para você) ou, sem campo, para `Var<float>("vida")`. As variáveis do pai também valem para o filho, que pode mudar o valor.
+
+```json
+{ "persistent": true, "variables": [ { "name": "vida", "type": "number", "value": 3 } ] }
+```
+
+### Objetos pais
+
+Como os Parent Objects do GameMaker, um objeto pode ser **filho** de outro. Na ficha, escolha o **Objeto pai** (ou escreva `"parent": "Inimigo"` no JSON). O filho:
+
+- **herda a ficha** do pai: sprite, cor, profundidade e componentes. O que o filho tiver na própria ficha vale mais, e um componente do mesmo tipo troca o do pai (os outros se somam);
+- **herda os eventos** do script do pai. Um filho só com ficha usa o script do pai direto. Um filho com script herda a classe do pai (`class Morcego : Inimigo`), e o editor troca a classe sozinho ao escolher o pai. Para rodar o evento do pai dentro do seu, chame `base.OnStep(dt)` (o `event_inherited` do GameMaker);
+- **entra nas buscas pelo nome do pai**: `Collide("Inimigo")`, `Move(..., solid: "Inimigo")`, `Game.Instances("Inimigo")`, `Game.Count("Inimigo")` e o alvo da IA também acham os filhos. No código, `Is("Inimigo")` pergunta se o objeto é do tipo ou descende dele, e `Parent` diz quem é o pai.
+
+Uma classe `abstract` serve só de pai (não entra na sala). Pais em círculo e pais que não existem dão um erro claro ao abrir a sala. No Exemplo, o `FantasmaAzul` é filho do `Fantasma`: herda a IA e só troca a cor e a luz.
+
+```json
+{ "parent": "Fantasma", "color": "#80A0FF", "components": [ { "type": "Light", "color": "#5080FF", "radius": 56 } ] }
+```
+
+## Código da sala
+
+O **Room Creation Code** do GameMaker. No Inspetor da sala, o botão **Código da sala** cria (ou abre) `rooms/nome.cs`, com uma classe filha de `RoomScript`. Ela roda quando a sala abre, **depois do `OnCreate` de todas as instâncias**, e serve para o que é da fase e não de um objeto: luz, música, inimigos extras, regras e cronômetros. Também abre em **C# Blocos**, com os eventos da sala.
+
+| Evento | Quando roda |
+|---|---|
+| `OnCreate()` | Quando a sala abre, depois das instâncias |
+| `OnStep(float dt)` | A cada quadro, depois do End Step dos objetos |
+| `OnDrawGui()` | Na interface, presa à tela, depois do Draw GUI dos objetos |
+| `OnEnd()` | Ao sair da sala (`Game.Goto` ou `Game.Restart`), antes de destruir as instâncias |
+
+```csharp
+[Room("noite")]
+public class SalaNoite : RoomScript
+{
+    public override void OnCreate() => Game.Spawn("FantasmaAzul", 100, 200);
+
+    public override void OnDrawGui() =>
+        Draw.Text($"Fantasmas: {Game.Count("Fantasma")}", Game.Width - 12, Game.Height - 24, size: 12, align: Align.Right);
+}
+```
+
+O atributo `[Room("noite")]` liga a classe à sala. Sem ele, vale o nome da classe, comparado sem maiúsculas e sem sinais (a sala `fase-1` acha a classe `Fase1`). Os jogos novos copiam só os `.json` de `rooms/` para a pasta do jogo, e o `.cs` é compilado junto com os objetos.
+
 ## C# Código e C# Blocos
 
 O script de um objeto se escreve de dois jeitos, e os dois são o mesmo arquivo `.cs`. Abra o script e use o botão **C# Blocos** no alto (o mesmo botão, agora **C# Código**, volta para o texto).
@@ -207,7 +271,7 @@ Como no GameMaker, a sala é uma pilha de **camadas**. No editor, o Inspetor da 
 
 - **Camada de instâncias:** guarda objetos. Com **Ordenar por Y**, quem está mais embaixo na tela fica na frente, e o personagem passa atrás do poste sem código. Um objeto ajusta o ponto de ordem com `SortOffset` (por exemplo, o pé de um poste alto) ou foge da regra com `YSort = false` e `Layer`.
 - **Camada de fundo:** cor, imagem (sprite) repetida na horizontal e na vertical, e **paralaxe** (0 presa ao mundo, 1 presa à tela).
-- **Salas:** no Inspetor, **▶ Testar esta sala**, **★ Sala inicial** e **Duplicar sala**. A sala inicial aparece com ★ na lista.
+- **Salas:** no Inspetor, **▶ Testar esta sala**, **★ Sala inicial**, **Duplicar sala** e **Código da sala** (veja [Código da sala](#código-da-sala)). A sala inicial aparece com ★ na lista.
 
 No arquivo, as camadas ficam em `layers`, e a instância diz a camada em `layer` (sem `layer`, vai para a primeira de instâncias). Salas sem `layers` continuam funcionando como antes.
 

@@ -17,7 +17,12 @@ public partial class MainWindow
     private bool _blocksHooked;
     private bool _writingBlocks;
 
-    private bool IsScriptDocument => IsObjectDocument && !IsObjectJson(ActiveDocument!.FullPath);
+    // O script de um objeto (objects/Nome.cs) ou o código de uma sala (rooms/nome.cs).
+    private bool IsScriptDocument => (IsObjectDocument && !IsObjectJson(ActiveDocument!.FullPath)) || IsRoomScriptDocument;
+
+    private bool IsRoomScriptDocument => ActiveDocument is { IsImage: false } document && !IsDiffOpen && RootFolder is not null
+        && GameFiles.IsGame(RootFolder) && string.Equals(Path.GetExtension(document.FullPath), ".cs", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(Path.GetDirectoryName(Path.GetFullPath(document.FullPath)), GameFiles.FolderOf(RootFolder, "room"), StringComparison.OrdinalIgnoreCase);
 
     public bool ShowsBlocks => IsScriptDocument && _blocksView.Contains(ActiveDocument!.FullPath) && !ShowsObject;
 

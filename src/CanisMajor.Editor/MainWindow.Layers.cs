@@ -337,6 +337,7 @@ public partial class MainWindow
         if (!isStart)
             actions.Children.Add(SmallButton("★ Sala inicial", "O jogo passa a começar por esta sala", () => SetStartRoom(name)));
         actions.Children.Add(SmallButton("Duplicar sala", "Cria uma cópia desta sala", () => _ = DuplicateRoomAsync(roomPath)));
+        AddRoomCodeButton(actions, name);
         Inspector.Children.Add(actions);
         if (isStart)
             AddNote("★ O jogo começa por esta sala.");

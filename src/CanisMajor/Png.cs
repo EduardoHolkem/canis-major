@@ -38,6 +38,20 @@ public static class Png
         if (rgba.Length != width * height * 4) throw new ArgumentException("tamanho dos pixels não bate com largura × altura × 4");
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         using var file = File.Create(path);
+        Write(file, width, height, rgba);
+    }
+
+    /// <summary>O PNG em memória, para mostrar uma prévia sem gravar arquivo.</summary>
+    public static byte[] Encode(int width, int height, ReadOnlySpan<byte> rgba)
+    {
+        if (rgba.Length != width * height * 4) throw new ArgumentException("tamanho dos pixels não bate com largura × altura × 4");
+        using var memory = new MemoryStream();
+        Write(memory, width, height, rgba);
+        return memory.ToArray();
+    }
+
+    private static void Write(Stream file, int width, int height, ReadOnlySpan<byte> rgba)
+    {
         file.Write([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
         var header = new byte[13];
         BinaryPrimitives.WriteUInt32BigEndian(header, (uint)width);

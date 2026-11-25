@@ -16,14 +16,14 @@ Engine de jogos 2D do Eduardo, inspirada no GameMaker. Núcleo em Rust (wgpu), j
 | Pasta | O que tem |
 |---|---|
 | `core\src` | Núcleo em Rust: janela (winit), desenho (`gfx.rs`), luz (`light.rs`), texto, som, malhas, shaders e a ponte (`lib.rs`) |
-| `src\CanisMajor` | A engine em C#: `Runtime` (laço do jogo), `GameObject`, componentes (`Components.cs`, `Lighting.cs`, `AI.cs`), camadas e tiles, `Pathfinding`, `Png`, `ShaderPresets` |
-| `src\CanisMajor.Editor` | O editor (Sirius adaptado). A parte de jogo fica em `MainWindow.Game.cs`, `MainWindow.Layers.cs`, `MainWindow.Objects.cs`, `MainWindow.Tilesets.cs`, `MainWindow.SpriteEditing.cs`, `MainWindow.Lighting.cs`, `MainWindow.AI.cs`, `MainWindow.Blocks.cs` e na pasta `Game` |
+| `src\CanisMajor` | A engine em C#: `Runtime` (laço do jogo; eventos em `RuntimeEvents.cs`, pais e código da sala em `RuntimeParents.cs`), `GameObject`, `RoomScript`, componentes (`Components.cs`, `Lighting.cs`, `AI.cs`), camadas e tiles, `Pathfinding`, `Png`, `ShaderPresets` |
+| `src\CanisMajor.Editor` | O editor (Sirius adaptado). A parte de jogo fica em `MainWindow.Game.cs`, `MainWindow.Layers.cs`, `MainWindow.Objects.cs`, `MainWindow.Tilesets.cs`, `MainWindow.SpriteEditing.cs`, `MainWindow.Lighting.cs`, `MainWindow.AI.cs`, `MainWindow.Blocks.cs`, `MainWindow.Parents.cs` (objeto pai e código da sala) e na pasta `Game` |
 | `src\CanisMajor.Cli` | O `cm` (novo jogo, exportar) |
 | `examples\Exemplo` | Jogo de exemplo, com as salas `inicio` e `noite` |
 | `tests` | Testes da engine (`CanisMajor.Tests`) e do editor (`CanisMajor.Editor.Tests`) |
 | `tools\empacotar.ps1` | Gera o zip de Releases em `dist` |
 
-Formato dos arquivos do jogo: `projeto.json`, `rooms/*.json` (com `layers` e `lighting`), `objects/Nome.cs` (script) e `objects/Nome.json` (ficha com componentes), `sprites/nome.png` e `nome.json` (quadros, origem, máscara), `sprites/nome_n.png` (normal map), `tilesets/*.json`, `shaders/*.wgsl` e `sounds/`.
+Formato dos arquivos do jogo: `projeto.json`, `rooms/*.json` (com `layers` e `lighting`), `rooms/nome.cs` (código da sala, classe filha de `RoomScript` com `[Room("nome")]`), `objects/Nome.cs` (script) e `objects/Nome.json` (ficha com componentes e o `parent`), `scripts/Nome.cs` (funções globais, como os scripts do GameMaker), `sprites/nome.png` e `nome.json` (quadros, origem, máscara), `sprites/nome_n.png` (normal map), `tilesets/*.json`, `shaders/*.wgsl` e `sounds/`.
 
 ## Compilar e testar
 
@@ -37,7 +37,7 @@ $env:DOTNET_ROOT="$env:LOCALAPPDATA\Microsoft\dotnet"; $env:NUGET_PACKAGES="D:\N
 - Engine: `dotnet test tests\CanisMajor.Tests -c Release`.
 - Editor: `dotnet test tests\CanisMajor.Editor.Tests` (demora uns 7 minutos, melhor rodar em segundo plano).
 - Testes que mexem no estado global do `Runtime` usam `[Collection("Runtime")]`.
-- `SingleInstanceTests.Varias_ao_mesmo_tempo_chegam_todas` é instável (passa sozinho). `SvgWindowTests.Svg_abre_com_o_desenho_ao_lado` falha só junto com os outros de SVG, já no código antigo. `McpTests.Claude_pergunta_pelo_canal_e_a_janela_responde` às vezes falha na rodada completa, mas passa sozinho (conferido 4 vezes em 13/11/2026).
+- `SingleInstanceTests.Varias_ao_mesmo_tempo_chegam_todas` é instável (passa sozinho). `SvgWindowTests.Svg_abre_com_o_desenho_ao_lado` falha só junto com os outros de SVG, já no código antigo. `McpTests.Claude_pergunta_pelo_canal_e_a_janela_responde` às vezes falha na rodada completa, mas passa sozinho (conferido 4 vezes em 13/11/2026). `DropTests.Soltar_foto_de_fora_abre_em_aba_e_mantem_o_projeto` falha quando `TEMP` é curto (como `D:\tmp`), porque espera o caminho encurtado com "…". Com o `TEMP` padrão, passa.
 - Conferir o visual: `dotnet run --project examples\Exemplo -c Release -- --room noite --frames 60 --screenshot D:\tmp\foto.png` (jogo) e `CanisMajor.Editor.exe <pasta> --open <arquivo> --blocks --shot D:\tmp\editor.png` (editor). A GPU é uma Radeon RX 560.
 - O `.csproj` dos jogos precisa levar `objects\*.json` e `tilesets\**` no `Content`.
 
@@ -60,8 +60,9 @@ $env:DOTNET_ROOT="$env:LOCALAPPDATA\Microsoft\dotnet"; $env:NUGET_PACKAGES="D:\N
 Da lista `C:\Users\Holkem\Downloads\Mecanicas-GameMaker-Canis-Major.md`, nesta ordem:
 
 1. ~~Eventos que faltam: Alarm, Collision, teclado, mouse, Begin e End Step e Draw GUI~~ (feito em 12/11/2026).
-2. Parent Objects (herança) e Room Creation Code.
-3. Partículas, câmeras e viewports.
-4. Sequences e Animation Curves.
+2. ~~Parent Objects (herança) e Room Creation Code~~ (feito em 13/11/2026). Junto, em 24/11/2026, a janela **Criar recurso** com modelos prontos de sala, objeto, sprite, shader, script e tileset (`Game/ResourceTemplates.cs` e `MainWindow.Templates.cs`) e a seção `scripts/`. Depois, o **Editor de Objetos** (`MainWindow.ObjectEditor.cs`): lista de eventos com + Adicionar evento, eventos herdados, variáveis definidas (`variables` na ficha, valores por instância na sala, `Vars` e `Var<T>` na engine) e objeto persistente.
+3. Complemento do Editor de Salas, como o Room Editor do GameMaker 2: câmeras e viewports, ordem de criação das instâncias, código por instância e salas filhas.
+4. Partículas.
+5. Sequences e Animation Curves.
 
 Também faltam Paths, física, Surfaces, Fonts, Timelines, GamePad, saves, rede, UI Layers e as ferramentas de Debugger e Profiler.

@@ -59,9 +59,15 @@ internal static unsafe partial class Runtime
             try { types = asm.GetTypes(); }
             catch (ReflectionTypeLoadException e) { types = e.Types.Where(t => t != null).ToArray()!; }
             foreach (var t in types)
-                if (t is { IsAbstract: false, IsClass: true } && t.IsSubclassOf(typeof(GameObject)) && t.GetConstructor(Type.EmptyTypes) != null)
-                    Types[t.Name] = t;
+            {
+                if (t.IsClass && t.IsSubclassOf(typeof(GameObject)) && t != typeof(DefinedObject))
+                {
+                    ObjectClasses[t.Name] = t;
+                    if (!t.IsAbstract && t.GetConstructor(Type.EmptyTypes) != null) Types[t.Name] = t;
+                }
+                else if (t.IsSubclassOf(typeof(RoomScript))) RegisterRoomScript(t);
                 else ComponentTypes.Register(t);
+            }
         }
     }
 
@@ -174,13 +180,15 @@ internal static unsafe partial class Runtime
     public static void LoadRoom(string name)
     {
         var room = Project!.LoadRoom(name);
-        foreach (var o in Instances.Where(o => o.Alive).ToList())
+        EndRoomCode();
+        // Os persistentes passam para a sala nova sem rodar o OnCreate de novo, como no GameMaker.
+        foreach (var o in Instances.Where(o => o.Alive && !o.Persistent).ToList())
         {
             o.Alive = false;
             o.OnDestroy();
             o.DestroyComponents();
         }
-        Instances = [];
+        Instances = Instances.Where(o => o.Alive && o.Persistent).ToList();
         Room = name;
         RoomWidth = room.Width;
         RoomHeight = room.Height;
@@ -223,6 +231,8 @@ internal static unsafe partial class Runtime
             ApplyProps(obj, inst);
             Create(obj);
         }
+        // O código da sala vem depois do OnCreate de todas as instâncias, como no GameMaker.
+        StartRoomCode(name);
     }
 
     /// <summary>As camadas da sala aberta.</summary>
@@ -286,27 +296,46 @@ internal static unsafe partial class Runtime
                 prop.SetValue(obj, value.Deserialize(prop.PropertyType, GameProject.Json));
             else if (type.GetField(name, flags) is { } field)
                 field.SetValue(obj, value.Deserialize(field.FieldType, GameProject.Json));
+            // Sem campo no script: vai para Vars, no tipo da variável definida no Editor de Objetos (se houver).
+            else if (VariablesOf(obj).TryGetValue(key, out var defined))
+                obj.Vars[defined.Name] = VariableDef.Convert(value, defined.Type);
             else
-                Console.Error.WriteLine($"Aviso: {type.Name} não tem a propriedade '{key}' usada na sala.");
+                obj.Vars[key] = Plain(value);
         }
     }
+
+    // Um valor do JSON como número, texto ou verdadeiro e falso, para Vars.
+    private static object? Plain(JsonNode value) => value is JsonValue v
+        ? v.TryGetValue<bool>(out var b) ? b
+        : v.TryGetValue<int>(out var i) ? i
+        : v.TryGetValue<double>(out var d) ? (float)d
+        : v.TryGetValue<string>(out var s) ? s
+        : value.ToJsonString()
+        : value.ToJsonString();
 
     public static GameObject Spawn(string kind, float x, float y, bool create = true)
     {
         if (Types.TryGetValue(kind, out var type))
             return Spawn(type, x, y, create);
-        // Sem classe, mas com a ficha em objects/Nome.json: o objeto existe só com os componentes.
+        if (ObjectClasses.TryGetValue(kind, out var abstractType) && ObjectDefOf(kind) is null)
+            throw new GameException($"A classe {abstractType.Name} é abstract (ou não tem construtor sem parâmetros) e não pode ser criada. Crie um objeto filho dela.");
+        // Sem classe, mas com a ficha em objects/Nome.json: o objeto usa o script do pai mais perto
+        // que tenha um, ou existe só com os componentes.
         if (ObjectDefOf(kind) is not null)
-            return Spawn(typeof(DefinedObject), x, y, create, kind);
+        {
+            var lineage = LineageOf(kind);
+            return Spawn(ClassFor(lineage), x, y, create, kind, lineage);
+        }
         throw new GameException($"O objeto '{kind}' não existe. Crie a classe {kind} : GameObject em objects/ ou a ficha objects/{kind}.json.");
     }
 
-    public static GameObject Spawn(Type type, float x, float y, bool create = true) => Spawn(type, x, y, create, null);
+    public static GameObject Spawn(Type type, float x, float y, bool create = true) => Spawn(type, x, y, create, null, null);
 
-    private static GameObject Spawn(Type type, float x, float y, bool create, string? kind)
+    private static GameObject Spawn(Type type, float x, float y, bool create, string? kind, string[]? lineage)
     {
         var obj = (GameObject)Activator.CreateInstance(type)!;
         obj.Kind = kind ?? type.Name;
+        obj.Lineage = lineage ?? LineageOf(obj.Kind, type);
         obj.X = x;
         obj.Y = y;
         ApplyDef(obj);
@@ -336,23 +365,7 @@ internal static unsafe partial class Runtime
     }
 
     // A ficha vem depois do construtor: o que o Inspetor diz vale mais que o padrão da classe.
-    internal static void ApplyDef(GameObject obj)
-    {
-        if (ObjectDefOf(obj.Kind) is not { } def) return;
-        if (def.Sprite is not null) obj.Sprite = def.Sprite;
-        if (def.Shader is not null) obj.Shader = def.Shader;
-        if (def.Layer is { } layer) obj.Layer = layer;
-        if (def.Visible is { } visible) obj.Visible = visible;
-        if (def.YSort is { } ysort) obj.YSort = ysort;
-        if (def.SortOffset is { } offset) obj.SortOffset = offset;
-        if (def.Color is { } color) obj.Color = Color.Hex(color);
-        if (def.Alpha is { } alpha) obj.Alpha = alpha;
-        if (def.ScaleX is { } sx) obj.ScaleX = sx;
-        if (def.ScaleY is { } sy) obj.ScaleY = sy;
-        if (def.Unlit is { } unlit) obj.Unlit = unlit;
-        foreach (var json in def.Components)
-            obj.Add(ComponentTypes.Create(json, $"objects/{obj.Kind}.json"));
-    }
+    // ApplyDef fica em RuntimeParents.cs, porque também aplica as fichas dos pais.
 
     public static void Destroy(GameObject obj)
     {
@@ -363,7 +376,7 @@ internal static unsafe partial class Runtime
     }
 
     public static IEnumerable<GameObject> InstancesOf(string? kind) =>
-        Instances.Where(o => o.Alive && (kind is null || string.Equals(o.Kind, kind, StringComparison.OrdinalIgnoreCase)));
+        Instances.Where(o => o.Alive && (kind is null || o.Is(kind))); // os filhos entram pelo nome do pai
 
     public static IEnumerable<T> InstancesOf<T>() where T : GameObject => Instances.OfType<T>().Where(o => o.Alive);
 
@@ -579,6 +592,7 @@ internal static unsafe partial class Runtime
         if (Started) Native.cm_shutdown();
         Started = false;
         Running = false;
+        RoomCode = null;
     }
 
     /// <summary>Mostra o erro do jogo só com as linhas dos scripts do usuário, no formato arquivo:linha.</summary>
